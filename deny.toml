@@ -1,18 +1,14 @@
 # cargo-deny configuration — dependency policy for thrindex.
-# Playbook §25: every dependency is a liability; audit and deny gates are CI-blocking.
+# Every dependency is a liability; audit and deny gates are CI-blocking.
 
 [graph]
-# Analyze the full dependency graph.
 targets = []
 
 [advisories]
-# Deny any crate with a published security advisory.
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 vulnerability = "deny"
-unmaintained = "warn"
 yanked = "deny"
-notice = "warn"
 
 [licenses]
 # Only permissive licenses are allowed.
@@ -23,24 +19,19 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFL",
+    "Unicode-3.0",
     "CC0-1.0",
 ]
-# Deny copyleft and viral licenses; any unknown license is a review flag.
 deny = ["GPL-2.0", "GPL-3.0", "LGPL-2.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0"]
 unlicensed = "deny"
 copyleft = "deny"
 
 [bans]
-# Deny exact-duplicate crates (different versions of the same crate).
 multiple-versions = "warn"
-# Deny wildcard dependencies (they break reproducibility).
 wildcards = "deny"
-# Deny any dep on deprecated crates.
 deny = []
 
 [sources]
-# Only allow crates from crates.io.
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]

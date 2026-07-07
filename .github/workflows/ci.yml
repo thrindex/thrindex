@@ -92,8 +92,8 @@ jobs:
       - name: Install torch (CPU-only, for SNN tests)
         run: uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Build and install thrindex extension (maturin)
-        run: maturin develop --release
+      - name: Build and install thrindex
+        run: pip install -e . --no-build-isolation
 
       # Gate 6: ruff lint + format check
       - name: ruff check
