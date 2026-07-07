@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Rust gates ────────────────────────────────────────────────────────────
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Gate 1: formatting
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      # Gate 2: lints (all warnings are errors)
+      - name: cargo clippy -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Gate 3: tests (includes unit + proptest suite)
+      - name: cargo test
+        run: cargo test --all-features
+
+      # Gate 4: supply-chain audit (advisory database)
+      - name: cargo audit
+        run: |
+          cargo install cargo-audit --quiet
+          cargo audit
+
+      # Gate 5: dependency policy (deny.toml)
+      - name: cargo deny check
+        run: |
+          cargo install cargo-deny --quiet
+          cargo deny check
+
+      # Docs must build clean (warning-free) — not a merge gate but logged
+      - name: cargo doc
+        run: cargo doc --no-deps --all-features 2>&1 | tee /tmp/cargo-doc.log
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  # ── Python gates ──────────────────────────────────────────────────────────
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Rust toolchain (needed for maturin build)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python dev dependencies
+        run: uv pip install --system ruff pyright pytest maturin
+
+      - name: Install torch (CPU-only, for SNN tests)
+        run: uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Build and install thrindex extension (maturin)
+        run: maturin develop --release
+
+      # Gate 6: ruff lint + format check
+      - name: ruff check
+        run: ruff check python/
+
+      # Gate 7: pyright strict type checking
+      - name: pyright
+        run: pyright
+
+      # Gate 8: pytest
+      - name: pytest
+        run: pytest python/tests/ -v

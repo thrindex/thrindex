@@ -1,0 +1,21 @@
+[package]
+name = "thrindex-numerics"
+version = "0.1.0"
+edition = "2021"
+authors = ["THRINDEX"]
+description = "Parameterized signed Q-format fixed-point arithmetic — the determinism substrate consumed bit-for-bit by compiler, simulator, and runtime."
+license = "Apache-2.0"
+repository = "https://github.com/thrindex/thrindex"
+documentation = "https://docs.rs/thrindex-numerics"
+keywords = ["fixed-point", "numerics", "neuromorphic", "deterministic", "snn"]
+categories = ["mathematics", "no-std"]
+rust-version = "1.85"
+
+# L0 rule: zero runtime dependencies beyond std.
+[dependencies]
+
+[dev-dependencies]
+proptest = "1"
+
+[features]
+default = []

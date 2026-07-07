@@ -1,0 +1,15 @@
+[package]
+name = "thrindex-py"
+version = "0.1.0"
+edition = "2024"
+description = "Thin PyO3 extension module — zero SNN logic; all computation in core crates"
+license = "Apache-2.0"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 + maturin wiring: exposes the compiled extension as `thrindex._core`.
+# Justification (§12): required for PyO3/maturin Python–Rust bridge (M1 DoD).
+pyo3 = { version = "0.29", features = ["extension-module"] }

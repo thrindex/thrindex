@@ -1,0 +1,58 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "thrindex"
+version = "0.1.0"  # single source of truth; __init__.py reads this via importlib.metadata
+description = "The neuromorphic infrastructure SDK"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    # Justification (§12): SNN layers are nn.Module subclasses; surrogate gradient
+    # training requires torch.autograd. No alternative exists in this stack.
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8",
+    "pyright>=1.1",
+    "pytest>=8.0",
+]
+examples = [
+    # torchvision is only needed to run the full MNIST validation script.
+    "torchvision>=0.15",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "thrindex._core"
+manifest-path = "crates/thrindex-py/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "ANN"]
+ignore = [
+    "ANN401",  # Dynamically typed expressions (Any) — needed in a few torch interop spots
+]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+pythonPlatform = "All"
+include = ["python"]
+# torch type stubs are intentionally incomplete; these rules produce false positives
+# against every torch API call and are suppressed project-wide rather than with
+# per-line `# type: ignore` comments scattered through 50+ call sites.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]

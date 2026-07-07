@@ -1,0 +1,57 @@
+# ── Rust ──────────────────────────────────────────────────────────────────
+/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+dist/
+build/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+
+# ── THRINDEX artifacts ────────────────────────────────────────────────────
+*.thx
+
+# ── macOS ─────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Editor ────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── CI / coverage ─────────────────────────────────────────────────────────
+coverage/
+*.lcov
+tarpaulin-report.html
+
+# ── proptest regression files (local dev artifact, not checked in) ─────────
+proptest-regressions/
+
+# ── Internal / not for public repo ────────────────────────────────────────
+# All internal engineering docs (ADRs, RFCs, Architecture, Guide, Engineering standards)
+internal/
+# Company strategy document — never public
+Neuromorphic_Infrastructure_Playbook.md
+# AI agent configuration — internal tooling
+.cursor/
+# Closed/proprietary boundary — excluded from public mirror
+closed/
