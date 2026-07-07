@@ -1,17 +1,18 @@
 # cargo-deny configuration — dependency policy for thrindex.
-# Every dependency is a liability; audit and deny gates are CI-blocking.
+# All licenses not in the allow list are denied by default.
+# All vulnerability advisories error by default.
 
 [graph]
 targets = []
 
 [advisories]
-db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
 yanked = "deny"
+unmaintained = "workspace"
+ignore = []
 
 [licenses]
-# Only permissive licenses are allowed.
+# Everything not listed here is denied automatically — no need for an explicit deny list.
 allow = [
     "MIT",
     "Apache-2.0",
@@ -22,9 +23,6 @@ allow = [
     "Unicode-3.0",
     "CC0-1.0",
 ]
-deny = ["GPL-2.0", "GPL-3.0", "LGPL-2.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0"]
-unlicensed = "deny"
-copyleft = "deny"
 
 [bans]
 multiple-versions = "warn"
