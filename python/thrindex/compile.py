@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import struct
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -155,8 +156,13 @@ def _serialise_conv2d(layer: ThxConv2d) -> dict[str, Any]:
 
 
 def _to_b64(t: Tensor) -> str:
-    """Encode a tensor as base64 little-endian f32 bytes (ADR-0006)."""
-    raw = t.to(dtype=torch.float32).contiguous().numpy().astype("<f4").tobytes()
+    """Encode a tensor as base64 little-endian f32 bytes (ADR-0006).
+
+    Uses ``struct.pack`` (stdlib) to avoid a numpy dependency — CI installs the
+    CPU-only torch wheel which ships without numpy.
+    """
+    flat: list[float] = t.to(dtype=torch.float32).contiguous().reshape(-1).tolist()
+    raw = struct.pack(f"<{len(flat)}f", *flat)
     return base64.b64encode(raw).decode("ascii")
 
 

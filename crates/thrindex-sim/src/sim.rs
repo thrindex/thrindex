@@ -471,6 +471,19 @@ mod tests {
             // Pin to "test" so the snapshot is not tied to a specific semver string.
             "test",
         );
-        insta::assert_snapshot!(transcript);
+        // Redact the wall-time line — it is a real timer and varies between runs.
+        let redacted: String = transcript
+            .lines()
+            .map(|l| {
+                if l.trim_start().starts_with("sim wall time:") {
+                    " sim wall time:       [time]"
+                } else {
+                    l
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        insta::assert_snapshot!(redacted);
     }
 }

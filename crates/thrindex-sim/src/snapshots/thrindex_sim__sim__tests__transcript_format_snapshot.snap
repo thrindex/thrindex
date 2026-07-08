@@ -14,5 +14,5 @@ expression: transcript
  output spike rate:   100.0%
  synaptic ops:        80
  modeled energy:      0.04 nJ  (coefficient: 0.5 pJ/syn-op — see docs/energy.md)
- sim wall time:       0.000s
+ sim wall time:       [time]
 ═══════════════════════════════════════════════════════
