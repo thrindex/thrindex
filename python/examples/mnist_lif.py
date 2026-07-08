@@ -256,7 +256,8 @@ def run_full_training(args: argparse.Namespace) -> None:
 
     print(f"\nTraining for {args.epochs} epochs…")
     print(f"Architecture: Dense(784,{HIDDEN}) → LIF → Dense({HIDDEN},10) → LIF")
-    print(f"T={T}, tau_mem={TAU_MEM}, alpha≈{math.exp(-1/TAU_MEM):.6f}, lr={args.lr}, batch={args.batch_size}\n")
+    alpha = math.exp(-1 / TAU_MEM)
+    print(f"T={T}, tau_mem={TAU_MEM}, alpha≈{alpha:.6f}, lr={args.lr}, batch={args.batch_size}\n")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
