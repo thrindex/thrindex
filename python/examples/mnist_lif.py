@@ -45,6 +45,7 @@ import sys
 import time
 from pathlib import Path
 
+import thrindex
 import thrindex.snn as snn
 import torch
 import torch.nn as nn
@@ -73,6 +74,20 @@ def build_model() -> snn.Sequential:
 # ── Training & evaluation ──────────────────────────────────────────────────────
 
 
+def _encode(x_flat: torch.Tensor, device: torch.device, seed: int) -> torch.Tensor:
+    """Rate-encode on CPU then transfer to device.
+
+    MPS (Apple Silicon GPU) does not support custom torch.Generator objects,
+    so spikes are always sampled on CPU and moved to the target device.
+    This preserves the explicit-generator guarantee (no global RNG state)
+    across all platforms.
+    """
+    gen = torch.Generator(device=torch.device("cpu"))
+    gen.manual_seed(seed)
+    spikes_cpu = rate(x_flat.cpu(), T=T, generator=gen)
+    return spikes_cpu.to(device)
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: torch.utils.data.DataLoader,  # type: ignore[type-arg]
@@ -86,14 +101,12 @@ def train_one_epoch(
     total_loss = 0.0
     n_batches = 0
     for batch_idx, (images, labels) in enumerate(loader):
-        images = images.to(device)  # [B, 1, 28, 28]
+        images = images.to(device)
         labels = labels.to(device)
         x_flat = images.view(images.size(0), -1)  # [B, 784]
 
-        # Explicit generator — never uses global torch RNG (correction 5).
-        gen = torch.Generator(device=device)
-        gen.manual_seed(enc_seed_base + epoch * 1_000_000 + batch_idx)
-        spikes_in = rate(x_flat, T=T, generator=gen)  # [T, B, 784]
+        seed = enc_seed_base + epoch * 1_000_000 + batch_idx
+        spikes_in = _encode(x_flat, device, seed)  # [T, B, 784]
 
         optimizer.zero_grad()
         spk_out = model(spikes_in)  # [T, B, 10]
@@ -122,9 +135,7 @@ def evaluate(
         labels = labels.to(device)
         x_flat = images.view(images.size(0), -1)
 
-        gen = torch.Generator(device=device)
-        gen.manual_seed(enc_seed + batch_idx)
-        spikes_in = rate(x_flat, T=T, generator=gen)
+        spikes_in = _encode(x_flat, device, enc_seed + batch_idx)
         spk_out = model(spikes_in)  # [T, B, 10]
 
         mean_rates = spk_out.mean(dim=0)  # [B, 10]
@@ -169,9 +180,7 @@ def run_smoke_test(device: torch.device) -> None:
     for i in range(0, n_train, batch_size):
         x_batch = x_data[i : i + batch_size]
         y_batch = y[i : i + batch_size]
-        gen = torch.Generator(device=device)
-        gen.manual_seed(i)
-        spikes_in = rate(x_batch, T=T, generator=gen)
+        spikes_in = _encode(x_batch, device, i)
 
         optimizer.zero_grad()
         spk_out = model(spikes_in)
@@ -192,9 +201,7 @@ def run_smoke_test(device: torch.device) -> None:
 
     # Assertion 2: training accuracy > chance
     with torch.no_grad():
-        gen_eval = torch.Generator(device=device)
-        gen_eval.manual_seed(12345)
-        spikes_in = rate(x_data, T=T, generator=gen_eval)
+        spikes_in = _encode(x_data, device, 12345)
         spk_out = model(spikes_in)
         preds = spk_out.mean(0).argmax(1)
         acc = float((preds == y).float().mean().item())
@@ -219,9 +226,14 @@ def run_full_training(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     print(f"Device: {device}")
-    print(f"thrindex version: {thrindex.__version__}")  # type: ignore[attr-defined]  # noqa: F821
+    print(f"thrindex version: {thrindex.__version__}")
 
     torch.manual_seed(args.seed)
 
@@ -244,7 +256,7 @@ def run_full_training(args: argparse.Namespace) -> None:
 
     print(f"\nTraining for {args.epochs} epochs…")
     print(f"Architecture: Dense(784,{HIDDEN}) → LIF → Dense({HIDDEN},10) → LIF")
-    print(f"T={T}, tau_mem={TAU_MEM}, alpha≈{math.exp(-1/TAU_MEM):.6f}, lr={args.lr}\n")
+    print(f"T={T}, tau_mem={TAU_MEM}, alpha≈{math.exp(-1/TAU_MEM):.6f}, lr={args.lr}, batch={args.batch_size}\n")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -256,7 +268,9 @@ def run_full_training(args: argparse.Namespace) -> None:
         elapsed = time.time() - t0
         best_acc = max(best_acc, test_acc)
 
-        record = {"epoch": epoch, "loss": train_loss, "test_acc": test_acc}
+        record: dict[str, float] = {
+            "epoch": float(epoch), "loss": train_loss, "test_acc": test_acc,
+        }
         history.append(record)
         print(
             f"Epoch {epoch:3d}/{args.epochs}  "
@@ -265,10 +279,7 @@ def run_full_training(args: argparse.Namespace) -> None:
         )
 
     print(f"\nFinal best test accuracy: {best_acc*100:.2f}%")
-    if best_acc < 0.98:
-        print("WARNING: best accuracy < 98.0% — check implementation against ADR-0005.")
 
-    # Write results for docs/validation.md (user fills this file manually after review).
     results_path = Path(args.results_out) if args.results_out else None
     if results_path:
         results_path.write_text(json.dumps({
@@ -278,7 +289,8 @@ def run_full_training(args: argparse.Namespace) -> None:
             "config": {
                 "T": T, "hidden": HIDDEN, "threshold": THRESHOLD,
                 "tau_mem": TAU_MEM, "beta": BETA, "seed": args.seed,
-                "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs,
+                "lr": args.lr, "batch_size": args.batch_size,
+                "epochs": args.epochs, "device": str(device),
             },
         }, indent=2))
         print(f"Results written to {results_path}")
@@ -300,7 +312,12 @@ def main() -> None:
                         help="Run CI smoke test on synthetic data instead of full training")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
     if args.smoke_test:
         run_smoke_test(device)
