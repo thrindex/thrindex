@@ -96,7 +96,7 @@ class TestWeightEncoding:
         raw = base64.b64decode(a["model"]["layers"][0]["weights_b64"])
         n = len(raw) // 4
         decoded = struct.unpack_from(f"<{n}f", raw)
-        original_list = original_w.to(torch.float32).contiguous().numpy().flatten().tolist()
+        original_list = original_w.to(torch.float32).contiguous().reshape(-1).tolist()
         assert list(decoded) == pytest.approx(original_list, abs=1e-7)
 
     def test_weights_little_endian(self, tmp_path: Path) -> None:

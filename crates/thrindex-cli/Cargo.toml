@@ -13,7 +13,7 @@ path = "src/main.rs"
 # Justification (§12): argument parsing for the CLI binary.
 clap = { version = "4", features = ["derive"] }
 # Justification (§12): all simulation logic; CLI is a thin presentation layer.
-thrindex-sim = { path = "../thrindex-sim" }
+thrindex-sim = { path = "../thrindex-sim", version = "0.2.0" }
 
 [dev-dependencies]
 # Justification: snapshot testing of §29 CLI transcript format.

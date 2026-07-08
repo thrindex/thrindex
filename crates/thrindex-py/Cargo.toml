@@ -14,4 +14,4 @@ crate-type = ["cdylib"]
 # Justification (§12): required for PyO3/maturin Python–Rust bridge (M1 DoD).
 pyo3 = { version = "0.29", features = ["extension-module"] }
 # Behavioral simulator: all execution logic lives here, not in this bridge crate.
-thrindex-sim = { path = "../thrindex-sim" }
+thrindex-sim = { path = "../thrindex-sim", version = "0.2.0" }
