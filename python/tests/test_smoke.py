@@ -22,10 +22,10 @@ def test_version_is_semver_shaped() -> None:
     )
 
 
-def test_version_is_0_1_0() -> None:
-    """Pin the exact M1 version, proving single-source derivation from pyproject.toml."""
-    assert thrindex.__version__ == "0.1.0", (
-        f"Expected '0.1.0', got {thrindex.__version__!r}. "
+def test_version_is_0_2_0() -> None:
+    """Pin the exact M2 version, proving single-source derivation from pyproject.toml."""
+    assert thrindex.__version__ == "0.2.0", (
+        f"Expected '0.2.0', got {thrindex.__version__!r}. "
         "Update pyproject.toml [project] version — that is the only place."
     )
 
@@ -54,3 +54,15 @@ def test_encoders_importable() -> None:
     assert callable(encoders.rate)
     assert callable(encoders.latency)
     assert callable(encoders.delta)
+
+
+def test_compile_importable() -> None:
+    """thrindex.compile must be importable as of M2."""
+    assert callable(thrindex.compile)
+
+
+def test_cli_importable() -> None:
+    """thrindex._cli.main must be importable as of M2."""
+    from thrindex._cli import main  # noqa: PLC0415
+
+    assert callable(main)

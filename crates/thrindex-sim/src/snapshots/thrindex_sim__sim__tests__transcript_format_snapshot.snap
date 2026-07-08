@@ -1,0 +1,18 @@
+---
+source: crates/thrindex-sim/src/sim.rs
+assertion_line: 474
+expression: transcript
+---
+═══════════════════════════════════════════════════════
+ thrindex test  |  target: sim  |  seed: 0
+═══════════════════════════════════════════════════════
+ model:  Dense(4→4) → LIF(τ=9ms)
+ input:  5 timesteps × 4 features
+───────────────────────────────────────────────────────
+ prediction:  class 3  —  rate score 1.000
+───────────────────────────────────────────────────────
+ output spike rate:   100.0%
+ synaptic ops:        80
+ modeled energy:      0.04 nJ  (coefficient: 0.5 pJ/syn-op — see docs/energy.md)
+ sim wall time:       0.000s
+═══════════════════════════════════════════════════════

@@ -2,5 +2,7 @@
 resolver = "2"
 members = [
     "crates/thrindex-numerics",
+    "crates/thrindex-sim",
+    "crates/thrindex-cli",
     "crates/thrindex-py",
 ]

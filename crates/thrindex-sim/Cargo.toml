@@ -1,0 +1,25 @@
+[package]
+name = "thrindex-sim"
+version = "0.2.0"
+edition = "2024"
+description = "Behavioral simulator — seeded, deterministic, CPU-parallel LIF execution"
+license = "Apache-2.0"
+
+[dependencies]
+# Justification (§12): typed errors, no boilerplate.
+thiserror = "2"
+# Justification (§12): JSON deserialization of .thx artifacts (ADR-0006).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Justification (§12): base64 decoding of weight arrays from .thx format (ADR-0006).
+base64 = "0.22"
+# Justification (§12): batch-level parallelism (Rayon, correction 8); samples only.
+rayon = "1"
+# Justification (§12): CRC32 integrity check for .thx artifacts (ADR-0006).
+crc32fast = "1"
+
+[dev-dependencies]
+# Justification: floating-point tolerance in golden-value tests.
+approx = "0.5"
+# Justification: §29 transcript snapshot tests — pins format against both CLI frontends.
+insta = "1"

@@ -23,7 +23,9 @@ build/
 .pyright/
 
 # ── THRINDEX artifacts ────────────────────────────────────────────────────
+# Ignore user-generated artifacts; track the seeded demo model in templates/.
 *.thx
+!templates/**/*.thx
 
 # ── macOS ─────────────────────────────────────────────────────────────────
 .DS_Store

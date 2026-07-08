@@ -1,0 +1,20 @@
+[package]
+name = "thrindex-cli"
+version = "0.2.0"
+edition = "2024"
+description = "thrindex CLI — `thrindex run`, `thrindex doctor`, `thrindex targets`"
+license = "Apache-2.0"
+
+[[bin]]
+name = "thrindex-cli"
+path = "src/main.rs"
+
+[dependencies]
+# Justification (§12): argument parsing for the CLI binary.
+clap = { version = "4", features = ["derive"] }
+# Justification (§12): all simulation logic; CLI is a thin presentation layer.
+thrindex-sim = { path = "../thrindex-sim" }
+
+[dev-dependencies]
+# Justification: snapshot testing of §29 CLI transcript format.
+insta = "1"

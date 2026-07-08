@@ -12,10 +12,11 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
 from thrindex import encoders, snn, train
+from thrindex.compile import compile_model as compile
 
 try:
     __version__: str = _pkg_version("thrindex")
 except PackageNotFoundError:
     __version__ = "0+uninstalled"
 
-__all__ = ["__version__", "encoders", "snn", "train"]
+__all__ = ["__version__", "compile", "encoders", "snn", "train"]
