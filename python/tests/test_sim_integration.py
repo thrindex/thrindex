@@ -16,7 +16,9 @@ from thrindex.compile import compile_model
 
 def _require_core() -> None:
     try:
-        import thrindex._core  # noqa: F401
+        import importlib
+
+        importlib.import_module("thrindex._core")
     except ImportError:
         pytest.skip("thrindex._core not built — run `maturin develop --uv`")
 
@@ -45,7 +47,7 @@ class TestCompileAndRun:
         g.manual_seed(0)
         spikes = torch.bernoulli(torch.full((1, 10, 8), 0.3), generator=g).tolist()
 
-        result_spikes, stats, transcript = run_sim(artifact, spikes, 1, 0)
+        result_spikes, _stats, _transcript = run_sim(artifact, spikes, 1, 0)
         assert len(result_spikes) == 1
         assert len(result_spikes[0]) == 10
         assert len(result_spikes[0][0]) == 4  # output neurons

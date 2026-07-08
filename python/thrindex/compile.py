@@ -105,7 +105,9 @@ def _serialise_layer(layer: nn.Module) -> dict[str, Any]:
 
 def _serialise_dense(layer: ThxDense) -> dict[str, Any]:
     w = layer.linear.weight.detach().cpu()
-    b = layer.linear.bias
+    # nn.Linear.bias is typed as Parameter in PyTorch stubs but is None when
+    # bias=False.  Explicit annotation avoids a spurious pyright comparison warning.
+    b: Tensor | None = layer.linear.bias  # type: ignore[assignment]
     return {
         "type": "dense",
         "in_features": w.shape[1],
@@ -134,7 +136,7 @@ def _serialise_lif(layer: LIF) -> dict[str, Any]:
 def _serialise_conv2d(layer: ThxConv2d) -> dict[str, Any]:
     conv = layer.conv
     w = conv.weight.detach().cpu()
-    b = conv.bias
+    b: Tensor | None = conv.bias  # type: ignore[assignment]
     out_c, in_c, kh, kw = w.shape
     return {
         "type": "conv2d",

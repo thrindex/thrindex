@@ -56,7 +56,11 @@ class TestCliPassthrough:
         cli_snap_setup: dict,  # type: ignore[type-arg]
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        from thrindex._cli import _cmd_run, _gen_demo_input, _parse_first_in_features
+        from thrindex._cli import (  # type: ignore[reportPrivateUsage]
+            _cmd_run,
+            _gen_demo_input,
+            _parse_first_in_features,
+        )
         from thrindex._core import run_sim  # type: ignore[import-untyped]
 
         artifact = cli_snap_setup["artifact"]
@@ -87,7 +91,10 @@ class TestTranscriptFormat:
     """
 
     def _get_transcript(self, artifact: str) -> str:
-        from thrindex._cli import _gen_demo_input, _parse_first_in_features
+        from thrindex._cli import (  # type: ignore[reportPrivateUsage]
+            _gen_demo_input,
+            _parse_first_in_features,
+        )
         from thrindex._core import run_sim  # type: ignore[import-untyped]
 
         n = _parse_first_in_features(artifact)
