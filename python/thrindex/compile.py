@@ -113,7 +113,7 @@ def _serialise_dense(layer: ThxDense) -> dict[str, Any]:
         "in_features": w.shape[1],
         "out_features": w.shape[0],
         "weights_b64": _to_b64(w),
-        "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,
+        "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
     }
 
 
@@ -147,7 +147,7 @@ def _serialise_conv2d(layer: ThxConv2d) -> dict[str, Any]:
         "stride": list(conv.stride),
         "padding": list(conv.padding),
         "weights_b64": _to_b64(w),
-        "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,
+        "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
     }
 
 

@@ -54,7 +54,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///     `spikes`      : list[list[list[float]]] — shape `[batch, T, out]`.
 ///     `stats_dict`  : dict with keys `total_spikes`, `synaptic_ops`, `wall_secs`.
 ///     `transcript`  : str — the §29-format transcript rendered in Rust.
-
 // PyO3 extracts Python lists into owned Vecs; `needless_pass_by_value` does not
 // apply here because the conversion is implicit in PyO3's FromPyObject machinery.
 #[allow(clippy::needless_pass_by_value)]
