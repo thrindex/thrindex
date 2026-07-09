@@ -246,9 +246,14 @@ class TestValidation:
             compile_model(nn.Linear(4, 4), tmp_path / "bad.thx")  # type: ignore[arg-type]
 
     def test_empty_sequential_raises(self, tmp_path: Path) -> None:
-        """Empty Sequential → E0105 from Rust compiler (validate pass)."""
+        """Empty model → E0105 from Rust compiler (validate pass).
+
+        Calls `_core.compile_to_thx` directly with a hand-crafted empty-layers
+        IR JSON — avoids mutating Sequential.layers which is a read-only property.
+        """
         _require_core()
-        m = snn.Sequential(snn.Dense(4, 4), snn.LIF())
-        m.layers = []  # type: ignore[attr-defined]
-        with pytest.raises((ValueError, Exception), match="E0105|no layers"):
-            compile_model(m, tmp_path / "empty.thx")
+        from thrindex._core import compile_to_thx  # type: ignore[import-untyped]
+
+        empty_ir = '{"dt_ms": 1.0, "layers": []}'
+        with pytest.raises(ValueError, match="E0105"):
+            compile_to_thx(empty_ir, "sim")

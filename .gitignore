@@ -23,9 +23,11 @@ build/
 .pyright/
 
 # ── THRINDEX artifacts ────────────────────────────────────────────────────
-# Ignore user-generated artifacts; track the seeded demo model in templates/.
+# Ignore user-generated artifacts; track the seeded demo model in templates/
+# and the frozen M2 backward-compat fixtures in the compiler test suite.
 *.thx
 !templates/**/*.thx
+!crates/thrindex-compiler/tests/fixtures/*.thx
 
 # ── macOS ─────────────────────────────────────────────────────────────────
 .DS_Store

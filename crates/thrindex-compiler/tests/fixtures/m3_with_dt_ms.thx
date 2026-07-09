@@ -1,0 +1,29 @@
+{
+  "format_version": "m2-draft",
+  "thrindex_version": "0.2.0",
+  "target": "sim",
+  "model": {
+    "layers": [
+      {
+        "type": "dense",
+        "in_features": 2,
+        "out_features": 2,
+        "weights_b64": "AACAPwAAAAAAAAAAAACAPw==",
+        "bias_b64": null
+      },
+      {
+        "type": "lif",
+        "threshold": 1.0,
+        "alpha": 0.9048374180359595,
+        "alpha_syn": null,
+        "reset": "subtract"
+      }
+    ]
+  },
+  "metadata": {
+    "compiled_at": "2026-01-01T00:00:00+00:00",
+    "model_canonical": "{\"layers\":[{\"bias_b64\":null,\"in_features\":2,\"out_features\":2,\"type\":\"dense\",\"weights_b64\":\"AACAPwAAAAAAAAAAAACAPw==\"},{\"alpha\":0.9048374180359595,\"alpha_syn\":null,\"reset\":\"subtract\",\"threshold\":1.0,\"type\":\"lif\"}]}",
+    "crc32": "01841e32",
+    "dt_ms": 1.0
+  }
+}
