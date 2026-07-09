@@ -1,13 +1,14 @@
 //! `thrindex-cli` — the standalone Rust binary.
 //!
-//! Peer consumer of `thrindex-sim`.  The Python `thrindex._cli` entrypoint is a
-//! separate peer consumer that calls the same library via `PyO3` — neither calls the
-//! other (correction 3 / ARCHITECTURE.md layer law).
+//! Peer consumer of `thrindex-sim` and `conformance`.  The Python `thrindex._cli`
+//! entrypoint is a separate peer consumer that calls the same libraries via `PyO3` —
+//! neither calls the other (correction 3 / ARCHITECTURE.md layer law).
 //!
 //! Usage:
-//!   thrindex-cli run <model.thx> [--seed N] [--threads N]
-//!   thrindex-cli doctor [--check <model.thx>] [--verbose]
-//!   thrindex-cli targets
+//!   thrindex run <model.thx> [--seed N] [--threads N]
+//!   thrindex bench --conformance --target sim [--artifact F] [--fixtures D]
+//!   thrindex doctor [--check <model.thx>] [--verbose]
+//!   thrindex targets
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -28,6 +29,8 @@ struct Cli {
 enum Commands {
     /// Load a `.thx` artifact and run the behavioral simulator.
     Run(cmd::run::RunArgs),
+    /// Run the conformance suite or performance benchmarks.
+    Bench(cmd::bench::BenchArgs),
     /// Diagnose the environment.
     Doctor(cmd::doctor::DoctorArgs),
     /// List available simulation targets.
@@ -44,6 +47,13 @@ fn main() {
                 Ok(())
             }
             Err(e) => Err(e.to_string()),
+        },
+        Commands::Bench(args) => match cmd::bench::run(args) {
+            Ok(report) => {
+                print!("{report}");
+                Ok(())
+            }
+            Err(e) => Err(e),
         },
         Commands::Doctor(args) => {
             print!("{}", cmd::doctor::run(args));

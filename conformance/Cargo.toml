@@ -18,6 +18,8 @@ thrindex-sim = { path = "../crates/thrindex-sim", version = "0.2.0" }
 serde_json = "1"
 # Justification (§12): typed errors.
 thiserror = "2"
+# Justification (§12): fixture set fingerprinting for frozen-set hash-pinning (ADR-0010 Part II).
+crc32fast = "1"
 
 [dev-dependencies]
 # Justification: snapshot testing of conformance report format and envelope constant.
