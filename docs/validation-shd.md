@@ -4,9 +4,20 @@
 
 **64.66% test accuracy** on SHD after 100 epochs.
 
+Run date: **2026-07-09**.
+
 This is the committed M2 credibility result. It was produced by a single unmodified run
 of `templates/keyword-spotting/train.py` on the hardware listed below, with no
 post-hoc hyperparameter tuning.
+
+## Floor assessment
+
+**PASS — 64.66% exceeds the committed ≥60.0% floor by 4.66 percentage points.**
+
+The floor (60%) was set with conservative margin below the Zheng et al. 2025 feedforward
+LIF reference of 69.0±5.8% "without conditions". The result (64.66%) sits within that
+reference band (63.2–74.8%), confirming the implementation is consistent with published
+feedforward LIF results on SHD.
 
 ## Accuracy floor and reference
 
