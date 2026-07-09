@@ -36,8 +36,8 @@ pip install thrindex
 thrindex run templates/keyword-spotting/model.thx --seed 0
 ```
 
-> **Note:** `model.thx` ships with **random (seeded) weights** as a pipeline demo.
-> Predictions are not meaningful.  Run `train.py` for benchmark weights.
+`model.thx` contains weights trained to **64.66% test accuracy** on SHD
+(see [docs/validation-shd.md](../../docs/validation-shd.md)).
 
 ## Full training
 
@@ -62,9 +62,9 @@ import thrindex.snn as snn
 
 model = snn.Sequential(
     snn.Dense(700, 512),
-    snn.LIF(threshold=1.0, tau_mem=20.0),
+    snn.LIF(threshold=0.3, tau_mem=20.0),
     snn.Dense(512, 20),
-    snn.LIF(threshold=1.0, tau_mem=20.0),
+    snn.LIF(threshold=0.3, tau_mem=20.0),
 )
 
 # After training:

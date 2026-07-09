@@ -10,6 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
+    "h5py>=3.16.0",
     # Justification (§12): SNN layers are nn.Module subclasses; surrogate gradient
     # training requires torch.autograd. No alternative exists in this stack.
     "torch>=2.0",
