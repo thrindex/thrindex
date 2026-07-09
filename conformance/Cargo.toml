@@ -1,0 +1,24 @@
+[package]
+name = "conformance"
+version = "0.4.0"
+edition = "2024"
+description = "THRINDEX Certified conformance harness (ADR-0010 Part I + DRAFT Part II)"
+license = "Apache-2.0"
+
+[[bin]]
+name = "ratify_envelope"
+path = "src/bin/ratify_envelope.rs"
+
+[dependencies]
+# Justification (§12): Backend trait and Capability descriptor.
+thrindex-backend-api = { path = "../crates/thrindex-backend-api", version = "0.4.0" }
+# Justification (§12): reference SimBackend and artifact loading.
+thrindex-sim = { path = "../crates/thrindex-sim", version = "0.2.0" }
+# Justification (§12): JSON for frozen test fixtures.
+serde_json = "1"
+# Justification (§12): typed errors.
+thiserror = "2"
+
+[dev-dependencies]
+# Justification: snapshot testing of conformance report format and envelope constant.
+insta = "1"

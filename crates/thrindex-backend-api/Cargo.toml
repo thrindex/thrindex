@@ -1,0 +1,12 @@
+[package]
+name = "thrindex-backend-api"
+version = "0.4.0"
+edition = "2024"
+description = "Backend plugin contract: capability descriptor and Backend trait (§16, ADR-0010)"
+license = "Apache-2.0"
+
+[dependencies]
+# Justification (§12): typed errors.
+thiserror = "2"
+# Justification (§12): serialization of Capability descriptor for capability negotiation.
+serde = { version = "1", features = ["derive"] }

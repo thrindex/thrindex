@@ -36,13 +36,26 @@ Rules:
 | E0108 | Graph IR JSON parse error | `thrindex-compiler` | capture |
 | E0109 | Dense delay array length does not match `in_features × out_features` | `thrindex-compiler` | validate |
 
+## M4 codes (E0201 – E0209)
+
+| Code | Summary | Source |
+|------|---------|--------|
+| E0201 | Backend artifact parse error | `thrindex-backend-api` |
+| E0202 | Backend input shape mismatch | `thrindex-backend-api` |
+| E0203 | Backend output shape mismatch during run | `thrindex-backend-api` |
+| E0204 | Backend execution failure | `thrindex-backend-api` |
+| E0205 | Conformance test set too small (< min_test_samples) | `conformance` |
+| E0206 | Backend output shape mismatch during conformance run | `conformance` |
+| E0207 | Backend execution error during conformance run | `conformance` |
+| E0208 | Reference simulator error during conformance run | `conformance` |
+
 ## Reserved ranges
 
 | Range | Owner |
 |-------|-------|
 | E0001 – E0099 | M2 (sim + CLI) |
 | E0100 – E0199 | M3 (compiler / Graph IR) |
-| E0200 – E0299 | M4 (quantisation / fixed-point) |
+| E0200 – E0299 | M4 (conformance, quantisation) |
 | E0300 – E0399 | M5 (hardware targets) |
 
 ## Format

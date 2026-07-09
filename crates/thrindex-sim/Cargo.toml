@@ -8,6 +8,8 @@ license = "Apache-2.0"
 [dependencies]
 # Justification (§12): typed errors, no boilerplate.
 thiserror = "2"
+# Justification (§12): implements the Backend trait from the plugin contract (ADR-0010 Part I).
+thrindex-backend-api = { path = "../thrindex-backend-api", version = "0.4.0" }
 # Justification (§12): JSON deserialization of .thx artifacts (ADR-0006).
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
