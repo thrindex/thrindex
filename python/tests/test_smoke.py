@@ -4,9 +4,16 @@ Version must be sourced from ``pyproject.toml`` (single source of truth, correct
 When this test fails on a version bump, update ONLY ``pyproject.toml [project] version``.
 """
 
+import json
 import re
+import time
+from pathlib import Path
 
+import pytest
 import thrindex
+
+# Resolved at import time — tests that use the template bail if the path is absent.
+_TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates" / "keyword-spotting"
 
 
 def test_version_is_defined() -> None:
@@ -66,3 +73,41 @@ def test_cli_importable() -> None:
     from thrindex._cli import main  # noqa: PLC0415
 
     assert callable(main)
+
+
+def test_golden_path_run_under_60s() -> None:
+    """Golden path: thrindex run on the keyword-spotting template completes in < 60 s.
+
+    Closes M2 box: 'Golden path timed — CI must confirm'.
+
+    Uses the first bundled sample directly via run_sim to avoid subprocess overhead.
+    The model carries placeholder (random) weights; the sim execution time is what
+    is being measured here, not accuracy.
+    """
+    try:
+        import importlib
+        importlib.import_module("thrindex._core")
+    except ImportError:
+        pytest.skip("thrindex._core not built — run `maturin develop`")
+
+    from thrindex._core import run_sim  # type: ignore[import-untyped]
+
+    model_path = _TEMPLATE_DIR / "model.thx"
+    sample_path = _TEMPLATE_DIR / "samples" / "sample_000.json"
+
+    if not model_path.exists() or not sample_path.exists():
+        pytest.skip("keyword-spotting template not present")
+
+    sample = json.loads(sample_path.read_text())
+    # run_sim expects [batch, timesteps, features] as f32; wrap in batch dim and cast.
+    spikes_f32 = [[float(v) for v in row] for row in sample["spikes"]]
+    input_spikes = [spikes_f32]
+
+    t0 = time.perf_counter()
+    _spikes, _stats, _transcript = run_sim(str(model_path), input_spikes, 1, 0)
+    elapsed = time.perf_counter() - t0
+
+    assert elapsed < 60.0, (
+        f"Golden path run took {elapsed:.2f}s — exceeds 60s budget. "
+        "Check for regression in thrindex-sim."
+    )
