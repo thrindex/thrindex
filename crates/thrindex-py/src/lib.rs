@@ -1,12 +1,13 @@
 //! `thrindex._core` — the compiled Rust extension module.
 //!
 //! This crate is intentionally thin: **zero SNN logic lives here**.  All
-//! computation belongs in `thrindex-sim` and future core crates, consumed via
-//! re-exports.
+//! computation belongs in `thrindex-sim`, `thrindex-compiler`, and future core
+//! crates, consumed via re-exports.
 //!
 //! Python consumers (correction 3 / ARCHITECTURE.md): `thx.run()` calls
-//! `_core.run_sim(...)` through this bridge.  The CLI binary (`thrindex-cli`) is a
-//! separate peer consumer of `thrindex-sim` — neither calls the other.
+//! `_core.run_sim(...)` and `thx.compile()` calls `_core.compile_to_thx(...)`
+//! through this bridge.  The CLI binary (`thrindex-cli`) is a separate peer
+//! consumer of `thrindex-sim` — neither calls the other.
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -15,6 +16,7 @@ use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use thrindex_compiler::compile;
 use thrindex_sim::{SimConfig, model, raster::SpikeRaster, sim};
 
 // ── Module ────────────────────────────────────────────────────────────────────
@@ -24,11 +26,13 @@ use thrindex_sim::{SimConfig, model, raster::SpikeRaster, sim};
 /// Exposed callables:
 /// - `run_sim(artifact_path, input_spikes, threads, seed) -> (spikes, stats, transcript)`
 /// - `check_artifact(path) -> None  # raises on error`
+/// - `compile_to_thx(ir_json, target) -> (thx_json, advisory_or_none)`
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(run_sim, m)?)?;
     m.add_function(wrap_pyfunction!(check_artifact, m)?)?;
+    m.add_function(wrap_pyfunction!(compile_to_thx, m)?)?;
     Ok(())
 }
 
@@ -113,4 +117,33 @@ fn run_sim(
 fn check_artifact(path: &str) -> PyResult<()> {
     model::load(path).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(())
+}
+
+// ── compile_to_thx ────────────────────────────────────────────────────────────
+
+/// Compile a Graph IR JSON string to a `.thx` artifact JSON string.
+///
+/// Parameters
+/// ----------
+/// `ir_json` : str
+///     Graph IR JSON produced by `thrindex.compile._build_ir_json()`.
+///     Must contain `dt_ms` (continuous) and layer descriptors with `tau_mem`
+///     (no `alpha`) for LIF layers (ADR-0008 two-level rule).
+/// `target` : str
+///     Target identifier.  ``"sim"`` is the only valid value for M3.
+///
+/// Returns
+/// -------
+/// `(thx_json, advisory)`
+///     `thx_json`  : str  — the sealed `.thx` artifact JSON.
+///     `advisory`  : str | None  — retiming advisory when `target dt ≠ authored dt`.
+///
+/// Raises
+/// ------
+/// `ValueError` with a §30-format `E####` message on any compile error.
+#[allow(clippy::needless_pass_by_value)]
+#[pyfunction]
+fn compile_to_thx(ir_json: String, target: String) -> PyResult<(String, Option<String>)> {
+    let report = compile(&ir_json, &target).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((report.thx_json, report.advisory))
 }

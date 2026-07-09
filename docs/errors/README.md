@@ -22,6 +22,20 @@ Rules:
 | E0009 | Artifact CRC32 integrity failure | `thrindex-sim` |
 | E0010 | Input dimension mismatch | `thrindex-sim` |
 
+## M3 codes (E0101 – E0109)
+
+| Code | Summary | Source | Pass |
+|------|---------|--------|------|
+| E0101 | LIF `tau_mem` ≤ effective `dt` (authored or retimed) | `thrindex-compiler` | validate / lower |
+| E0102 | Synaptic delay cannot be retimed — non-integer step ratio | `thrindex-compiler` | lower |
+| E0103 | Synaptic delay exceeds target's declared maximum | `thrindex-compiler` | lower |
+| E0104 | Target has no native delay support and emulation is disabled | `thrindex-compiler` | lower |
+| E0105 | Model has no layers | `thrindex-compiler` | validate |
+| E0106 | Consecutive layers have incompatible dimensions | `thrindex-compiler` | validate |
+| E0107 | LIF `reset` string is not recognized (validated in validate pass, not serde) | `thrindex-compiler` | validate |
+| E0108 | Graph IR JSON parse error | `thrindex-compiler` | capture |
+| E0109 | Dense delay array length does not match `in_features × out_features` | `thrindex-compiler` | validate |
+
 ## Reserved ranges
 
 | Range | Owner |

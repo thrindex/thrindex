@@ -1,0 +1,13 @@
+[package]
+name = "thrindex-ir"
+version = "0.3.0"
+edition = "2024"
+description = "Graph IR — typed, continuous-parameter representation of SNN models (ADR-0008, ADR-0009)"
+license = "Apache-2.0"
+
+[dependencies]
+# Justification (§12): typed errors, no boilerplate.
+thiserror = "2"
+# Justification (§12): Graph IR serialization from/to JSON (capture input from Python SDK).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

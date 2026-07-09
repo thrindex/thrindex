@@ -1,0 +1,8 @@
+---
+source: crates/thrindex-compiler/tests/error_snapshots.rs
+expression: err.to_string()
+---
+E0101: LIF tau_mem too small for effective dt in layer 0
+Why: tau_mem=0.5000 ms is ≤ dt=1.0000 ms; the membrane would lose all history within one step (ADR-0005 guard, ADR-0008).
+Fix: set tau_mem > 1.0000 ms when constructing the LIF layer.
+Docs: https://docs.thrindex.com/errors/E0101

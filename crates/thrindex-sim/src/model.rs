@@ -199,10 +199,23 @@ pub fn load(path: &str) -> Result<ResolvedModel, SimError> {
     let content = std::fs::read_to_string(path).map_err(|_| SimError::ArtifactNotFound {
         path: path.to_string(),
     })?;
+    load_from_str(&content)
+}
 
+/// Parse and resolve a `.thx` artifact from a JSON string in memory.
+///
+/// Identical to [`load`] except it accepts a pre-read string rather than a file path.
+/// Used for backward-compatibility tests (frozen M2 fixture strings) and by
+/// `thrindex-compiler`'s integration tests.
+///
+/// # Errors
+///
+/// Returns [`SimError`] for `E0002` (wrong version), `E0003`–`E0009` (see [`load`]).
+/// Does **not** produce `E0001` (`ArtifactNotFound`) — there is no path.
+pub fn load_from_str(json: &str) -> Result<ResolvedModel, SimError> {
     // Parse the raw JSON.
     let artifact: ThxArtifact =
-        serde_json::from_str(&content).map_err(|e| SimError::JsonParseError {
+        serde_json::from_str(json).map_err(|e| SimError::JsonParseError {
             detail: e.to_string(),
         })?;
 

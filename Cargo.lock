@@ -648,6 +648,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "thrindex-compiler"
+version = "0.3.0"
+dependencies = [
+ "base64",
+ "crc32fast",
+ "insta",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "thrindex-ir",
+ "thrindex-sim",
+]
+
+[[package]]
+name = "thrindex-ir"
+version = "0.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "thrindex-numerics"
 version = "0.1.0"
 dependencies = [
@@ -659,6 +682,7 @@ name = "thrindex-py"
 version = "0.2.0"
 dependencies = [
  "pyo3",
+ "thrindex-compiler",
  "thrindex-sim",
 ]
 

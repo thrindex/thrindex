@@ -1,0 +1,8 @@
+---
+source: crates/thrindex-compiler/tests/error_snapshots.rs
+expression: err.to_string()
+---
+E0107: invalid LIF reset mode "hard" in layer 0
+Why: reset must be "subtract" or "zero" (Playbook §28 canonical vocab).
+Fix: change reset to "subtract" or "zero" when constructing the LIF layer.
+Docs: https://docs.thrindex.com/errors/E0107

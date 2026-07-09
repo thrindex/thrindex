@@ -1,0 +1,8 @@
+---
+source: crates/thrindex-compiler/tests/error_snapshots.rs
+expression: err.to_string()
+---
+E0108: Graph IR JSON parse error: missing field `dt_ms` at line 1 column 13
+Why: the input is not valid Graph IR JSON (produced by thx.compile's Python extraction pass).
+Fix: verify the Graph IR was produced by a current version of the thrindex Python SDK.
+Docs: https://docs.thrindex.com/errors/E0108

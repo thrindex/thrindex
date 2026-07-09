@@ -1,0 +1,25 @@
+[package]
+name = "thrindex-compiler"
+version = "0.3.0"
+edition = "2024"
+description = "Compiler front: capture → validate → lower Graph IR to target artifacts (ADR-0008, ADR-0009)"
+license = "Apache-2.0"
+
+[dependencies]
+# Justification (§12): Graph IR types (ADR-0008, ADR-0009).
+thrindex-ir = { path = "../thrindex-ir", version = "0.3.0" }
+# Justification (§12): typed errors, no boilerplate.
+thiserror = "2"
+# Justification (§12): JSON serialization of Graph IR input and .thx artifact output.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Justification (§12): base64 encoding of weight and delay arrays in .thx (ADR-0006).
+base64 = "0.22"
+# Justification (§12): CRC32 integrity check for .thx artifacts (ADR-0006).
+crc32fast = "1"
+
+[dev-dependencies]
+# Justification: snapshot tests for §30-format error messages (ENGINEERING.md).
+insta = "1"
+# Justification: backward-compat test loads M2 artifacts through thrindex-sim.
+thrindex-sim = { path = "../thrindex-sim", version = "0.2.0" }

@@ -15,3 +15,6 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.29", features = ["extension-module"] }
 # Behavioral simulator: all execution logic lives here, not in this bridge crate.
 thrindex-sim = { path = "../thrindex-sim", version = "0.2.0" }
+# Compiler pipeline (capture → validate → lower): Graph IR JSON → .thx artifact JSON.
+# Justification (§12): M3 thx.compile routes through this to enforce two-level rule.
+thrindex-compiler = { path = "../thrindex-compiler", version = "0.3.0" }

@@ -1,20 +1,32 @@
 """Model compiler: serialize a :class:`thrindex.snn.Sequential` to a ``.thx`` artifact.
 
-The compiler resolves all derived constants at compile time (correction 4 / ADR-0007):
-- ``alpha = exp(-dt / tau_mem)``
-- ``alpha_syn = exp(-dt / tau_syn)``
+## Architecture (M3 — ADR-0008, ADR-0009)
 
-Weights are stored as base64-encoded little-endian f32 arrays (ADR-0006).
-The simulator reads ``alpha`` directly and never calls ``exp``.
+The compile path is now split into two passes:
+
+1. **Python extraction pass** (this module): walks the PyTorch model and emits a
+   *Graph IR JSON* string containing **continuous parameters** — ``tau_mem``, ``tau_syn``,
+   ``threshold``, ``reset``.  ``alpha`` is **never computed in Python** (two-level rule,
+   ADR-0008).
+
+2. **Rust compilation pass** (``thrindex._core.compile_to_thx``): runs capture →
+   validate → lower, resolving ``alpha = exp(-dt/tau_mem)`` at the target's effective
+   ``dt``, encoding delays, computing CRC32, and emitting the sealed ``.thx`` JSON.
+
+## Why the split?
+
+Resolving ``alpha`` in Python and resolving it in Rust for the same ``tau_mem``/``dt``
+pair may differ at the last ULP due to Python's ``math.exp`` vs Rust's ``libm::exp``.
+Centralising resolution in Rust ensures a single, audited code path and that every
+artifact's ``alpha`` matches what the simulator would compute (ADR-0007 §4).
 """
 
 from __future__ import annotations
 
 import base64
 import json
-import math
 import struct
-from datetime import UTC, datetime
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -32,82 +44,73 @@ if TYPE_CHECKING:
 
 __all__ = ["compile_model"]
 
-# The format version string written into every artifact (ADR-0006).
-_FORMAT_VERSION = "m2-draft"
-
 
 def compile_model(
     model: nn.Module,
     path: str | Path,
     target: str = "sim",
-    version: str = "0.2.0",
+    version: str = "0.3.0",
 ) -> None:
     """Compile *model* to a ``.thx`` artifact at *path*.
 
     Parameters
     ----------
     model:
-        A :class:`thrindex.snn.Sequential` — the only supported container for M2.
+        A :class:`thrindex.snn.Sequential` — the only supported container for M3.
     path:
         Output path.  The ``.thx`` extension is conventional but not enforced.
     target:
-        Target identifier.  ``"sim"`` is the only valid value for M2.
+        Target identifier.  ``"sim"`` is the only valid value for M3.
     version:
-        thrindex SDK version written into artifact metadata.
+        thrindex SDK version.  Used for informational metadata only; the Rust
+        compiler writes its own ``CARGO_PKG_VERSION`` into the artifact.
     """
     if not isinstance(model, Sequential):
         raise TypeError(
             f"compile_model expects a thrindex.snn.Sequential, got {type(model).__name__}"
         )
 
-    layers_json: list[dict[str, Any]] = []
-    for layer in model.layers:
-        layers_json.append(_serialise_layer(layer))
+    ir_json = _build_ir_json(model)
+    thx_json, advisory = _compile_via_rust(ir_json, target)
 
-    model_block = {"layers": layers_json}
+    if advisory is not None:
+        print(f"THRINDEX WARNING: {advisory}", file=sys.stderr)
 
-    # Canonical model JSON (sorted keys, compact) — stored in metadata so that
-    # both Python and Rust hash the SAME bytes without serde re-serialisation drift.
-    model_canonical = json.dumps(model_block, sort_keys=True, separators=(",", ":"))
-    crc = _crc32_hex(model_canonical.encode("utf-8"))
-
-    artifact: dict[str, Any] = {
-        "format_version": _FORMAT_VERSION,
-        "thrindex_version": version,
-        "target": target,
-        "model": model_block,
-        "metadata": {
-            "compiled_at": datetime.now(UTC).isoformat(),
-            # model_canonical is the exact bytes that were hashed.
-            # The Rust loader reads this field and recomputes crc32 — no serde drift.
-            "model_canonical": model_canonical,
-            "crc32": crc,
-        },
-    }
-
-    Path(path).write_text(json.dumps(artifact, indent=2), encoding="utf-8")
+    Path(path).write_text(thx_json, encoding="utf-8")
 
 
-# ── Layer serialisers ──────────────────────────────────────────────────────────
+# ── Graph IR extraction (Python pass) ─────────────────────────────────────────
 
 
-def _serialise_layer(layer: nn.Module) -> dict[str, Any]:
+def _build_ir_json(model: Sequential, dt_ms: float = 1.0) -> str:
+    """Walk *model* and produce a Graph IR JSON string.
+
+    The Graph IR carries **continuous** parameters only (ADR-0008 two-level rule):
+    - LIF: ``tau_mem``, ``tau_syn``, ``threshold``, ``reset`` — **no ``alpha``**.
+    - Dense: weights, optional bias, optional delays (not yet exposed in M3 SDK).
+    - Conv2d: weights, channels, kernel shape, stride, padding — **no delays**
+      (Conv2d-delay support deferred, ADR-0009 v1 scope).
+    """
+    layers: list[dict[str, Any]] = [_serialise_layer_ir(layer) for layer in model.layers]
+    ir: dict[str, Any] = {"dt_ms": dt_ms, "layers": layers}
+    return json.dumps(ir)
+
+
+def _serialise_layer_ir(layer: nn.Module) -> dict[str, Any]:
     if isinstance(layer, ThxDense):
-        return _serialise_dense(layer)
+        return _serialise_dense_ir(layer)
     if isinstance(layer, ThxConv2d):
-        return _serialise_conv2d(layer)
+        return _serialise_conv2d_ir(layer)
     if isinstance(layer, LIF):
-        return _serialise_lif(layer)
+        return _serialise_lif_ir(layer)
     raise TypeError(
         f"unsupported layer type for compile_model: {type(layer).__name__}. "
-        "Only Dense, Conv2d, and LIF are supported in M2."
+        "Only Dense, Conv2d, and LIF are supported."
     )
 
 
-def _serialise_dense(layer: ThxDense) -> dict[str, Any]:
+def _serialise_dense_ir(layer: ThxDense) -> dict[str, Any]:
     w = layer.linear.weight.detach().cpu()
-    # nn.Linear.bias is typed as Parameter in PyTorch stubs but is None when
-    # bias=False.  Explicit annotation avoids a spurious pyright comparison warning.
     b: Tensor | None = layer.linear.bias  # type: ignore[assignment]
     return {
         "type": "dense",
@@ -115,30 +118,28 @@ def _serialise_dense(layer: ThxDense) -> dict[str, Any]:
         "out_features": w.shape[0],
         "weights_b64": _to_b64(w),
         "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
+        "delays": None,
     }
 
 
-def _serialise_lif(layer: LIF) -> dict[str, Any]:
-    # Resolve derived constants at compile time — the simulator NEVER calls exp.
-    # ADR-0005: alpha = exp(-dt / tau_mem), dt = 1.0 ms canonical.
-    alpha: float = math.exp(-LIF.DT / layer.tau_mem)
-    alpha_syn: float | None = (
-        math.exp(-LIF.DT / layer.tau_syn) if layer.tau_syn is not None else None
-    )
+def _serialise_lif_ir(layer: LIF) -> dict[str, Any]:
+    # ADR-0008 two-level rule: emit tau_mem (continuous), NOT alpha (resolved).
+    # alpha = exp(-dt / tau_mem) is computed by the Rust lower pass.
     return {
         "type": "lif",
+        "tau_mem": float(layer.tau_mem),
+        "tau_syn": float(layer.tau_syn) if layer.tau_syn is not None else None,
         "threshold": float(layer.threshold),
-        "alpha": alpha,
-        "alpha_syn": alpha_syn,
         "reset": layer.reset,
     }
 
 
-def _serialise_conv2d(layer: ThxConv2d) -> dict[str, Any]:
+def _serialise_conv2d_ir(layer: ThxConv2d) -> dict[str, Any]:
     conv = layer.conv
     w = conv.weight.detach().cpu()
     b: Tensor | None = conv.bias  # type: ignore[assignment]
     out_c, in_c, kh, kw = w.shape
+    # Conv2d carries no delays (ADR-0009 v1 scope — deferred).
     return {
         "type": "conv2d",
         "in_channels": in_c,
@@ -150,6 +151,29 @@ def _serialise_conv2d(layer: ThxConv2d) -> dict[str, Any]:
         "weights_b64": _to_b64(w),
         "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
     }
+
+
+# ── Rust compilation pass ─────────────────────────────────────────────────────
+
+
+def _compile_via_rust(ir_json: str, target: str) -> tuple[str, str | None]:
+    """Call ``thrindex._core.compile_to_thx`` to run the Rust compilation pipeline.
+
+    Returns ``(thx_json, advisory_or_none)``.
+
+    Raises ``ValueError`` (with §30-format E#### message) on any compile error.
+    Raises ``ImportError`` when the native extension is not installed (development mode).
+    """
+    try:
+        from thrindex import _core  # type: ignore[attr-defined]
+    except ImportError as exc:
+        raise ImportError(
+            "thrindex._core is not installed.  "
+            "Build it with `maturin develop` or `pip install thrindex`."
+        ) from exc
+
+    thx_json, advisory = _core.compile_to_thx(ir_json, target)
+    return thx_json, advisory
 
 
 # ── Encoding helpers ───────────────────────────────────────────────────────────
@@ -164,15 +188,3 @@ def _to_b64(t: Tensor) -> str:
     flat: list[float] = t.to(dtype=torch.float32).contiguous().reshape(-1).tolist()
     raw = struct.pack(f"<{len(flat)}f", *flat)
     return base64.b64encode(raw).decode("ascii")
-
-
-def _crc32_hex(data: bytes) -> str:
-    """Return a CRC32 of *data* as an 8-character lowercase hex string.
-
-    Uses ``zlib.crc32`` (stdlib), which returns the same value as the
-    ``crc32fast`` Rust crate for the same input bytes.
-    """
-    import zlib
-
-    value = zlib.crc32(data) & 0xFFFF_FFFF
-    return f"{value:08x}"

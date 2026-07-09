@@ -1,0 +1,8 @@
+---
+source: crates/thrindex-compiler/tests/error_snapshots.rs
+expression: err.to_string()
+---
+E0106: layer dimension mismatch at layer 1
+Why: layer 1 declares 4 input features but layer 0 produces 8 output features.
+Fix: recheck the architecture — input/output sizes must chain correctly.
+Docs: https://docs.thrindex.com/errors/E0106

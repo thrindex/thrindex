@@ -1,0 +1,8 @@
+---
+source: crates/thrindex-compiler/tests/error_snapshots.rs
+expression: err.to_string()
+---
+E0105: model has no layers
+Why: an empty Sequential cannot be compiled or simulated.
+Fix: add at least one layer to the model before calling thx.compile().
+Docs: https://docs.thrindex.com/errors/E0105
