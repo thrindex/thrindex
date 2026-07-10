@@ -565,199 +565,6 @@ fn check(passes: bool) -> &'static str {
     if passes { "✓" } else { "✗ PROBLEM" }
 }
 
-// ─── Unit tests ──────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // ── round_half_to_even ──────────────────────────────────────────────────
-
-    #[test]
-    fn round_half_to_even_rounds_down_on_even_floor() {
-        assert_eq!(
-            round_half_to_even(2.5_f32),
-            2.0,
-            "2.5 must round to 2 (even)"
-        );
-    }
-
-    #[test]
-    fn round_half_to_even_rounds_up_on_odd_floor() {
-        assert_eq!(
-            round_half_to_even(3.5_f32),
-            4.0,
-            "3.5 must round to 4 (even)"
-        );
-    }
-
-    #[test]
-    fn round_half_to_even_negative_tie() {
-        assert_eq!(
-            round_half_to_even(-2.5_f32),
-            -2.0,
-            "-2.5 must round to -2 (even)"
-        );
-    }
-
-    #[test]
-    fn round_half_to_even_non_tie_behaves_normally() {
-        assert_eq!(round_half_to_even(2.3_f32), 2.0);
-        assert_eq!(round_half_to_even(2.7_f32), 3.0);
-    }
-
-    // ── quantize_per_channel_int8 ───────────────────────────────────────────
-
-    #[test]
-    fn per_channel_int8_uses_per_row_scale() {
-        let weights = vec![1.0_f32, 0.5, 0.5_f32, 0.25];
-        let q = quantize_per_channel_int8(&weights, 2);
-        let expected_row0_w0 = 127.0_f32 / 127.0;
-        let expected_row1_w0 = 127.0_f32 * (0.5 / 127.0);
-        assert!((q[0] - expected_row0_w0).abs() < 1e-5);
-        assert!((q[2] - expected_row1_w0).abs() < 1e-5);
-        assert!((q[1] - q[3]).abs() > 1e-6, "rows must use different scales");
-    }
-
-    #[test]
-    fn per_channel_int8_identity_on_max_weight() {
-        let weights = vec![0.8_f32, 0.3, -0.8, 0.1_f32, 0.7, -0.1];
-        let q = quantize_per_channel_int8(&weights, 2);
-        assert!((q[0] - 0.8_f32).abs() < 1e-5);
-        assert!((q[4] - 0.7_f32).abs() < 1e-5);
-    }
-
-    #[test]
-    fn per_channel_int8_preserves_tiny_row_per_channel() {
-        let weights = vec![100.0_f32, 50.0, 0.001_f32, 0.0];
-        let q8 = quantize_per_channel_int8(&weights, 2);
-        let q8_tensor = quantize_per_tensor_int8(&weights);
-        assert!(
-            (q8[2] - 0.001_f32).abs() < 1e-4,
-            "per-channel preserves tiny row: {}",
-            q8[2]
-        );
-        assert_eq!(q8_tensor[2], 0.0, "per-tensor crushes tiny row to 0");
-    }
-
-    // ── quantize_per_channel_int4 ───────────────────────────────────────────
-
-    #[test]
-    fn per_channel_int4_uses_scale_7() {
-        // Row 0: max=0.7, scale=0.7/7=0.1. 0.7/0.1=7.0 → 7 → dq=0.7.
-        let weights = vec![0.7_f32, 0.0, 0.35_f32, 0.0];
-        let q = quantize_per_channel_int4(&weights, 2);
-        assert!(
-            (q[0] - 0.7_f32).abs() < 1e-5,
-            "max weight should round-trip: {}",
-            q[0]
-        );
-    }
-
-    #[test]
-    fn per_channel_int4_clamps_to_pm7() {
-        let weights = vec![1.0_f32, -1.0];
-        let q = quantize_per_channel_int4(&weights, 1);
-        // scale = 1.0/7. 1.0/scale = 7.0 → clamp → 7 → dq = 1.0.
-        assert!((q[0] - 1.0_f32).abs() < 1e-5);
-        assert!((q[1] + 1.0_f32).abs() < 1e-5);
-    }
-
-    #[test]
-    fn per_channel_int4_has_more_error_than_int8() {
-        // int4 has 127/7 ≈ 18× fewer quantization steps → more rounding error.
-        let weights: Vec<f32> = (0..128).map(|i| (i as f32) / 127.0).collect();
-        let q8 = quantize_per_channel_int8(&weights, 1);
-        let q4 = quantize_per_channel_int4(&weights, 1);
-        let err8: f64 = weights
-            .iter()
-            .zip(q8.iter())
-            .map(|(w, q)| (w - q).abs() as f64)
-            .sum();
-        let err4: f64 = weights
-            .iter()
-            .zip(q4.iter())
-            .map(|(w, q)| (w - q).abs() as f64)
-            .sum();
-        assert!(
-            err4 > err8 * 2.0,
-            "int4 must have >2× more error than int8: err4={err4:.4e} err8={err8:.4e}"
-        );
-    }
-
-    #[test]
-    fn int4_max_representable_is_7() {
-        let weights = vec![0.5_f32];
-        let q4 = quantize_per_channel_int4(&weights, 1);
-        // scale = 0.5/7, 0.5/scale = 7.0 → clamp 7 → dq = 7 × 0.5/7 = 0.5.
-        assert!((q4[0] - 0.5_f32).abs() < 1e-5);
-    }
-
-    // ── fixture_fingerprint ─────────────────────────────────────────────────
-
-    #[test]
-    fn fingerprint_is_deterministic() {
-        let f1 = Fixture {
-            raw: "abc".to_string(),
-            spikes: vec![],
-            label: 0,
-        };
-        let f2 = Fixture {
-            raw: "def".to_string(),
-            spikes: vec![],
-            label: 1,
-        };
-        let fp1 = fixture_fingerprint(&[f1, f2]);
-        let f3 = Fixture {
-            raw: "abc".to_string(),
-            spikes: vec![],
-            label: 0,
-        };
-        let f4 = Fixture {
-            raw: "def".to_string(),
-            spikes: vec![],
-            label: 1,
-        };
-        let fp2 = fixture_fingerprint(&[f3, f4]);
-        assert_eq!(fp1, fp2);
-    }
-
-    #[test]
-    fn fingerprint_changes_on_content_change() {
-        let f1 = Fixture {
-            raw: "abc".to_string(),
-            spikes: vec![],
-            label: 0,
-        };
-        let fp1 = fixture_fingerprint(&[f1]);
-        let f2 = Fixture {
-            raw: "abd".to_string(),
-            spikes: vec![],
-            label: 0,
-        };
-        let fp2 = fixture_fingerprint(&[f2]);
-        assert_ne!(fp1, fp2);
-    }
-
-    // ── derive_threshold ────────────────────────────────────────────────────
-
-    #[test]
-    fn threshold_sits_in_gap() {
-        let r = derive_threshold(0.005, 0.020, 0.40);
-        assert!(r.int8_passes, "int8 must pass");
-        assert!(r.int4_fails, "int4 must fail");
-        assert!(!r.gap_too_narrow);
-        // threshold should be 0.005 + 0.40*(0.020-0.005) = 0.005+0.006 = 0.011
-        assert!((r.threshold - 0.011).abs() < 1e-10);
-    }
-
-    #[test]
-    fn threshold_flags_narrow_gap() {
-        let r = derive_threshold(0.010, 0.011, 0.40);
-        assert!(r.gap_too_narrow, "gap ratio 1.1× should be flagged");
-    }
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 fn main() {
@@ -1128,4 +935,195 @@ fn main() {
     println!("NOTE: This output does not constitute certification.");
     println!("ADR-0010 Part II must be amended by the founder before any backend");
     println!("can claim THRINDEX Certified. DRAFT envelope remains in effect.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── round_half_to_even ──────────────────────────────────────────────────
+
+    #[test]
+    fn round_half_to_even_rounds_down_on_even_floor() {
+        assert_eq!(
+            round_half_to_even(2.5_f32),
+            2.0,
+            "2.5 must round to 2 (even)"
+        );
+    }
+
+    #[test]
+    fn round_half_to_even_rounds_up_on_odd_floor() {
+        assert_eq!(
+            round_half_to_even(3.5_f32),
+            4.0,
+            "3.5 must round to 4 (even)"
+        );
+    }
+
+    #[test]
+    fn round_half_to_even_negative_tie() {
+        assert_eq!(
+            round_half_to_even(-2.5_f32),
+            -2.0,
+            "-2.5 must round to -2 (even)"
+        );
+    }
+
+    #[test]
+    fn round_half_to_even_non_tie_behaves_normally() {
+        assert_eq!(round_half_to_even(2.3_f32), 2.0);
+        assert_eq!(round_half_to_even(2.7_f32), 3.0);
+    }
+
+    // ── quantize_per_channel_int8 ───────────────────────────────────────────
+
+    #[test]
+    fn per_channel_int8_uses_per_row_scale() {
+        let weights = vec![1.0_f32, 0.5, 0.5_f32, 0.25];
+        let q = quantize_per_channel_int8(&weights, 2);
+        let expected_row0_w0 = 127.0_f32 / 127.0;
+        let expected_row1_w0 = 127.0_f32 * (0.5 / 127.0);
+        assert!((q[0] - expected_row0_w0).abs() < 1e-5);
+        assert!((q[2] - expected_row1_w0).abs() < 1e-5);
+        assert!((q[1] - q[3]).abs() > 1e-6, "rows must use different scales");
+    }
+
+    #[test]
+    fn per_channel_int8_identity_on_max_weight() {
+        let weights = vec![0.8_f32, 0.3, -0.8, 0.1_f32, 0.7, -0.1];
+        let q = quantize_per_channel_int8(&weights, 2);
+        assert!((q[0] - 0.8_f32).abs() < 1e-5);
+        assert!((q[4] - 0.7_f32).abs() < 1e-5);
+    }
+
+    #[test]
+    fn per_channel_int8_preserves_tiny_row_per_channel() {
+        let weights = vec![100.0_f32, 50.0, 0.001_f32, 0.0];
+        let q8 = quantize_per_channel_int8(&weights, 2);
+        let q8_tensor = quantize_per_tensor_int8(&weights);
+        assert!(
+            (q8[2] - 0.001_f32).abs() < 1e-4,
+            "per-channel preserves tiny row: {}",
+            q8[2]
+        );
+        assert_eq!(q8_tensor[2], 0.0, "per-tensor crushes tiny row to 0");
+    }
+
+    // ── quantize_per_channel_int4 ───────────────────────────────────────────
+
+    #[test]
+    fn per_channel_int4_uses_scale_7() {
+        // Row 0: max=0.7, scale=0.7/7=0.1. 0.7/0.1=7.0 → 7 → dq=0.7.
+        let weights = vec![0.7_f32, 0.0, 0.35_f32, 0.0];
+        let q = quantize_per_channel_int4(&weights, 2);
+        assert!(
+            (q[0] - 0.7_f32).abs() < 1e-5,
+            "max weight should round-trip: {}",
+            q[0]
+        );
+    }
+
+    #[test]
+    fn per_channel_int4_clamps_to_pm7() {
+        let weights = vec![1.0_f32, -1.0];
+        let q = quantize_per_channel_int4(&weights, 1);
+        // scale = 1.0/7. 1.0/scale = 7.0 → clamp → 7 → dq = 1.0.
+        assert!((q[0] - 1.0_f32).abs() < 1e-5);
+        assert!((q[1] + 1.0_f32).abs() < 1e-5);
+    }
+
+    #[test]
+    fn per_channel_int4_has_more_error_than_int8() {
+        // int4 has 127/7 ≈ 18× fewer quantization steps → more rounding error.
+        let weights: Vec<f32> = (0..128).map(|i| (i as f32) / 127.0).collect();
+        let q8 = quantize_per_channel_int8(&weights, 1);
+        let q4 = quantize_per_channel_int4(&weights, 1);
+        let err8: f64 = weights
+            .iter()
+            .zip(q8.iter())
+            .map(|(w, q)| (w - q).abs() as f64)
+            .sum();
+        let err4: f64 = weights
+            .iter()
+            .zip(q4.iter())
+            .map(|(w, q)| (w - q).abs() as f64)
+            .sum();
+        assert!(
+            err4 > err8 * 2.0,
+            "int4 must have >2× more error than int8: err4={err4:.4e} err8={err8:.4e}"
+        );
+    }
+
+    #[test]
+    fn int4_max_representable_is_7() {
+        let weights = vec![0.5_f32];
+        let q4 = quantize_per_channel_int4(&weights, 1);
+        // scale = 0.5/7, 0.5/scale = 7.0 → clamp 7 → dq = 7 × 0.5/7 = 0.5.
+        assert!((q4[0] - 0.5_f32).abs() < 1e-5);
+    }
+
+    // ── fixture_fingerprint ─────────────────────────────────────────────────
+
+    #[test]
+    fn fingerprint_is_deterministic() {
+        let f1 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let f2 = Fixture {
+            raw: "def".to_string(),
+            spikes: vec![],
+            label: 1,
+        };
+        let fp1 = fixture_fingerprint(&[f1, f2]);
+        let f3 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let f4 = Fixture {
+            raw: "def".to_string(),
+            spikes: vec![],
+            label: 1,
+        };
+        let fp2 = fixture_fingerprint(&[f3, f4]);
+        assert_eq!(fp1, fp2);
+    }
+
+    #[test]
+    fn fingerprint_changes_on_content_change() {
+        let f1 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let fp1 = fixture_fingerprint(&[f1]);
+        let f2 = Fixture {
+            raw: "abd".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let fp2 = fixture_fingerprint(&[f2]);
+        assert_ne!(fp1, fp2);
+    }
+
+    // ── derive_threshold ────────────────────────────────────────────────────
+
+    #[test]
+    fn threshold_sits_in_gap() {
+        let r = derive_threshold(0.005, 0.020, 0.40);
+        assert!(r.int8_passes, "int8 must pass");
+        assert!(r.int4_fails, "int4 must fail");
+        assert!(!r.gap_too_narrow);
+        // threshold should be 0.005 + 0.40*(0.020-0.005) = 0.005+0.006 = 0.011
+        assert!((r.threshold - 0.011).abs() < 1e-10);
+    }
+
+    #[test]
+    fn threshold_flags_narrow_gap() {
+        let r = derive_threshold(0.010, 0.011, 0.40);
+        assert!(r.gap_too_narrow, "gap ratio 1.1× should be flagged");
+    }
 }
