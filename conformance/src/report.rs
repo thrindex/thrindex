@@ -47,6 +47,12 @@ pub struct ConformanceReport {
     pub agg_max_rate_error: f64,
     /// Prediction agreement fraction across all samples.
     pub pred_agreement: f64,
+    /// T_mean threshold from the envelope used for this run (stored for self-contained rendering).
+    pub envelope_t_mean: f64,
+    /// T_max threshold from the envelope used for this run.
+    pub envelope_t_max: f64,
+    /// P_min threshold from the envelope used for this run.
+    pub envelope_p_min: f64,
 }
 
 impl ConformanceReport {
@@ -101,20 +107,23 @@ impl ConformanceReport {
         writeln!(s, " Prediction agreement:   {:.2}%", self.pred_agreement * 100.0).ok();
         writeln!(s, "{sep}").ok();
 
+        // Use stored thresholds — the report is self-contained and does not need the
+        // envelope to be passed in at render time. This avoids referencing global constants
+        // and correctly handles both v0_draft and v0 (and future v1, v2, ...) reports.
+        let metrics_pass = self.agg_mean_rate_error <= self.envelope_t_mean
+            && self.agg_max_rate_error <= self.envelope_t_max
+            && self.pred_agreement >= self.envelope_p_min;
+
         match self.envelope_status {
             EnvelopeStatus::Draft => {
-                if self.metrics_within_draft_thresholds(&crate::CONFORMANCE_ENVELOPE_V0_DRAFT) {
+                if metrics_pass {
                     writeln!(s, " WOULD PASS (draft thresholds) — not certification-valid").ok();
                 } else {
                     writeln!(s, " WOULD FAIL (draft thresholds) — not certification-valid").ok();
                 }
             }
             EnvelopeStatus::Final => {
-                // passed() requires Final envelope; compute manually here.
-                let pass = self.agg_mean_rate_error <= crate::CONFORMANCE_ENVELOPE_V0_DRAFT.t_mean_threshold
-                    && self.agg_max_rate_error <= crate::CONFORMANCE_ENVELOPE_V0_DRAFT.t_max_threshold
-                    && self.pred_agreement >= crate::CONFORMANCE_ENVELOPE_V0_DRAFT.pred_agreement_min;
-                if pass {
+                if metrics_pass {
                     writeln!(s, " PASS — THRINDEX Certified [{}]", self.envelope_version).ok();
                 } else {
                     writeln!(s, " FAIL — does not meet conformance thresholds").ok();

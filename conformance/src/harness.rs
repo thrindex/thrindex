@@ -133,6 +133,11 @@ pub fn run_conformance(
         agg_mean_rate_error: agg_mean,
         agg_max_rate_error: agg_max,
         pred_agreement: pred_agree,
+        // Store envelope thresholds so the report can render itself without a
+        // reference to the global envelope constant (supports v0, v1, ... uniformly).
+        envelope_t_mean: envelope.t_mean_threshold,
+        envelope_t_max: envelope.t_max_threshold,
+        envelope_p_min: envelope.pred_agreement_min,
     })
 }
 

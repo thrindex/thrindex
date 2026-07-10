@@ -1,12 +1,16 @@
 //! `thrindex bench --conformance --target sim` — conformance check command.
 //!
-//! Runs the conformance harness (ADR-0010 Part I) using the reference `SimBackend`
+//! Runs the conformance harness (ADR-0010) using the reference `SimBackend`
 //! as both reference and backend-under-test. Since the simulator is deterministic,
-//! all per-neuron rate errors are 0.0 and the report should read:
+//! all per-neuron rate errors are 0.0.
 //!
+//! With ≥100 samples (full ratification set) the report reads:
 //! ```text
-//! WOULD PASS (draft thresholds) — not certification-valid
+//! PASS — THRINDEX Certified [v0]
 //! ```
+//!
+//! With fewer than 100 samples (e.g. the 3 bundled template samples) the report is
+//! labeled "STRUCTURAL DEMO — insufficient samples for ratification".
 //!
 //! This command:
 //! 1. Loads a `.thx` artifact (default: `templates/keyword-spotting/model.thx`).
@@ -32,9 +36,9 @@
 use clap::Args;
 
 use conformance::{
+    CONFORMANCE_ENVELOPE_V0,
     CONFORMANCE_ENVELOPE_V0_DRAFT,
     harness::run_conformance,
-    report::EnvelopeStatus,
 };
 use thrindex_sim::SimBackend;
 
@@ -110,25 +114,20 @@ pub fn run(args: &BenchArgs) -> Result<String, String> {
     let reference = SimBackend::new(1);
     let backend = SimBackend::new(1); // backend-under-test is also the sim (M4 reference)
 
-    let envelope = &CONFORMANCE_ENVELOPE_V0_DRAFT;
+    // Full conformance runs use the ratified V0 envelope. Structural demos
+    // (fewer than 100 samples) use the superseded DRAFT with relaxed sample count
+    // so the report cannot be confused with real certification output.
+    let structural_demo = n_loaded < CONFORMANCE_ENVELOPE_V0.min_test_samples;
 
-    // If we have fewer than min_test_samples, run with what we have but flag it.
-    let structural_demo = n_loaded < envelope.min_test_samples;
-
-    // Use a relaxed envelope for structural demo runs.
     let demo_envelope;
     let active_envelope = if structural_demo {
         demo_envelope = conformance::ConformanceEnvelope {
-            version: envelope.version,
-            status: EnvelopeStatus::Draft,
-            t_mean_threshold: envelope.t_mean_threshold,
-            t_max_threshold: envelope.t_max_threshold,
-            pred_agreement_min: envelope.pred_agreement_min,
             min_test_samples: n_loaded, // accept whatever we loaded
+            ..CONFORMANCE_ENVELOPE_V0_DRAFT
         };
         &demo_envelope
     } else {
-        envelope
+        &CONFORMANCE_ENVELOPE_V0
     };
 
     let report = run_conformance(&backend, &reference, &artifact_json, &inputs, active_envelope)
@@ -141,10 +140,9 @@ pub fn run(args: &BenchArgs) -> Result<String, String> {
         use std::fmt::Write as _;
         let _ = write!(
             out,
-            "\n⚠ STRUCTURAL DEMO — {n_loaded} samples loaded (minimum for ratification: {}).\n\
-             Run `cargo run -p conformance --bin ratify_envelope` with the frozen ≥100-sample\n\
-             SHD fixture set (ADR-0010 Part II Step 1) for the real ratification measurement.\n",
-            envelope.min_test_samples
+            "\n⚠ STRUCTURAL DEMO — {n_loaded} samples loaded (minimum for certification: {}).\n\
+             Provide ≥100 samples via --fixtures to obtain a certification-valid run.\n",
+            CONFORMANCE_ENVELOPE_V0.min_test_samples
         );
     }
 
