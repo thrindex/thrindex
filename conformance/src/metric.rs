@@ -39,10 +39,7 @@
 ///
 /// Panics if the rasters have different shapes.
 #[must_use]
-pub fn per_neuron_rate_errors(
-    ref_raster: &[Vec<f32>],
-    test_raster: &[Vec<f32>],
-) -> Vec<f64> {
+pub fn per_neuron_rate_errors(ref_raster: &[Vec<f32>], test_raster: &[Vec<f32>]) -> Vec<f64> {
     assert_eq!(
         ref_raster.len(),
         test_raster.len(),
@@ -142,11 +139,12 @@ pub fn prediction(raster: &[Vec<f32>]) -> usize {
 ///
 /// Panics if batch sizes differ.
 #[must_use]
-pub fn prediction_agreement(
-    ref_rasters: &[Vec<Vec<f32>>],
-    test_rasters: &[Vec<Vec<f32>>],
-) -> f64 {
-    assert_eq!(ref_rasters.len(), test_rasters.len(), "batch sizes must match");
+pub fn prediction_agreement(ref_rasters: &[Vec<Vec<f32>>], test_rasters: &[Vec<Vec<f32>>]) -> f64 {
+    assert_eq!(
+        ref_rasters.len(),
+        test_rasters.len(),
+        "batch sizes must match"
+    );
     if ref_rasters.is_empty() {
         return 1.0;
     }
@@ -174,7 +172,11 @@ pub fn hamming_fraction(ref_raster: &[Vec<f32>], test_raster: &[Vec<f32>]) -> f6
             }
         }
     }
-    if total == 0 { 0.0 } else { diff as f64 / total as f64 }
+    if total == 0 {
+        0.0
+    } else {
+        diff as f64 / total as f64
+    }
 }
 
 /// Mean first-spike latency error (steps) over neurons that fire in **both** rasters.
@@ -182,10 +184,7 @@ pub fn hamming_fraction(ref_raster: &[Vec<f32>], test_raster: &[Vec<f32>]) -> f6
 /// **Informational metric only** — not a pass/fail criterion (ADR-0010 Part I §6).
 /// Returns 0.0 if no neuron fires in both rasters.
 #[must_use]
-pub fn mean_first_spike_latency_error(
-    ref_raster: &[Vec<f32>],
-    test_raster: &[Vec<f32>],
-) -> f64 {
+pub fn mean_first_spike_latency_error(ref_raster: &[Vec<f32>], test_raster: &[Vec<f32>]) -> f64 {
     if ref_raster.is_empty() || ref_raster[0].is_empty() {
         return 0.0;
     }
@@ -200,7 +199,11 @@ pub fn mean_first_spike_latency_error(
             count += 1;
         }
     }
-    if count == 0 { 0.0 } else { total / count as f64 }
+    if count == 0 {
+        0.0
+    } else {
+        total / count as f64
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +222,10 @@ mod tests {
     fn self_distance_is_zero() {
         let r = raster(&[(0, 0), (2, 1), (5, 0)], 10, 4);
         let errors = per_neuron_rate_errors(&r, &r);
-        assert!(errors.iter().all(|&e| e == 0.0), "self-distance must be exactly 0");
+        assert!(
+            errors.iter().all(|&e| e == 0.0),
+            "self-distance must be exactly 0"
+        );
         assert_eq!(mean_rate_error(&errors), 0.0);
         assert_eq!(max_rate_error(&errors), 0.0);
     }
@@ -242,7 +248,8 @@ mod tests {
         let expected = 1.0 / 100.0;
         assert!(
             (errors[0] - expected).abs() < 1e-12,
-            "1-spike miss → rate_error = 1/T = {expected}; got {}", errors[0]
+            "1-spike miss → rate_error = 1/T = {expected}; got {}",
+            errors[0]
         );
         assert_eq!(errors[1], 0.0);
     }
@@ -265,14 +272,20 @@ mod tests {
     fn short_trial_scaling_t10() {
         // For T=10, effective T_mean = max(0.02, 1/10) = 0.10.
         let eff = effective_t_mean(0.02, 10);
-        assert!((eff - 0.10).abs() < 1e-12, "expected 0.10 for T=10, got {eff}");
+        assert!(
+            (eff - 0.10).abs() < 1e-12,
+            "expected 0.10 for T=10, got {eff}"
+        );
     }
 
     #[test]
     fn short_trial_scaling_t100() {
         // For T=100, effective T_mean = 0.02 (no adjustment).
         let eff = effective_t_mean(0.02, 100);
-        assert!((eff - 0.02).abs() < 1e-12, "expected 0.02 for T=100, got {eff}");
+        assert!(
+            (eff - 0.02).abs() < 1e-12,
+            "expected 0.02 for T=100, got {eff}"
+        );
     }
 
     #[test]

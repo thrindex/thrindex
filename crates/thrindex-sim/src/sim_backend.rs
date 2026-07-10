@@ -58,12 +58,17 @@ impl Backend for SimBackend {
         artifact_json: &str,
         inputs: &[Vec<Vec<f32>>],
     ) -> Result<Vec<Vec<Vec<f32>>>, BackendError> {
-        let resolved = model::load_from_str(artifact_json)
-            .map_err(|e| BackendError::ArtifactParse { detail: e.to_string() })?;
+        let resolved =
+            model::load_from_str(artifact_json).map_err(|e| BackendError::ArtifactParse {
+                detail: e.to_string(),
+            })?;
 
-        let config = SimConfig { threads: self.threads };
-        let output = sim::run(&resolved, inputs, &config)
-            .map_err(|e| BackendError::Execution { detail: e.to_string() })?;
+        let config = SimConfig {
+            threads: self.threads,
+        };
+        let output = sim::run(&resolved, inputs, &config).map_err(|e| BackendError::Execution {
+            detail: e.to_string(),
+        })?;
 
         Ok(output.spikes)
     }

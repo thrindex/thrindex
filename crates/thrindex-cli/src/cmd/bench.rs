@@ -36,9 +36,7 @@
 use clap::Args;
 
 use conformance::{
-    CONFORMANCE_ENVELOPE_V0,
-    CONFORMANCE_ENVELOPE_V0_DRAFT,
-    harness::run_conformance,
+    CONFORMANCE_ENVELOPE_V0, CONFORMANCE_ENVELOPE_V0_DRAFT, harness::run_conformance,
 };
 use thrindex_sim::SimBackend;
 
@@ -69,12 +67,10 @@ pub struct BenchArgs {
 #[allow(clippy::type_complexity)]
 pub fn run(args: &BenchArgs) -> Result<String, String> {
     if !args.conformance {
-        return Err(
-            "thrindex bench: no action specified.\n\
+        return Err("thrindex bench: no action specified.\n\
              Use `thrindex bench --conformance --target sim` to run the conformance suite.\n\
              Use `thrindex bench --help` for more options."
-                .to_string(),
-        );
+            .to_string());
     }
 
     if args.target != "sim" {
@@ -130,8 +126,14 @@ pub fn run(args: &BenchArgs) -> Result<String, String> {
         &CONFORMANCE_ENVELOPE_V0
     };
 
-    let report = run_conformance(&backend, &reference, &artifact_json, &inputs, active_envelope)
-        .map_err(|e| e.to_string())?;
+    let report = run_conformance(
+        &backend,
+        &reference,
+        &artifact_json,
+        &inputs,
+        active_envelope,
+    )
+    .map_err(|e| e.to_string())?;
 
     // ── Render ─────────────────────────────────────────────────────────────────
     let mut out = report.render();
@@ -164,11 +166,7 @@ fn load_fixtures(dir: &str) -> Result<(Vec<Vec<Vec<f32>>>, usize), String> {
     let mut entries: Vec<_> = std::fs::read_dir(path)
         .map_err(|e| format!("cannot read directory '{dir}': {e}"))?
         .filter_map(std::result::Result::ok)
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .starts_with("sample_")
-        })
+        .filter(|e| e.file_name().to_string_lossy().starts_with("sample_"))
         .collect();
     entries.sort_by_key(std::fs::DirEntry::file_name);
 

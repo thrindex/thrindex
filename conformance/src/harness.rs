@@ -23,7 +23,7 @@ use crate::{
     ConformanceEnvelope,
     error::ConformanceError,
     metric::{
-        hamming_fraction, mean_first_spike_latency_error, mean_rate_error, max_rate_error,
+        hamming_fraction, max_rate_error, mean_first_spike_latency_error, mean_rate_error,
         per_neuron_rate_errors, prediction, prediction_agreement,
     },
     report::{ConformanceReport, SampleMetrics},
@@ -65,19 +65,19 @@ pub fn run_conformance(
     for (idx, input) in inputs.iter().enumerate() {
         let wrapped = vec![input.clone()];
 
-        let ref_out = reference
-            .run_batch(artifact_json, &wrapped)
-            .map_err(|e| ConformanceError::ReferenceError {
+        let ref_out = reference.run_batch(artifact_json, &wrapped).map_err(|e| {
+            ConformanceError::ReferenceError {
                 sample_idx: idx,
                 detail: e.to_string(),
-            })?;
+            }
+        })?;
 
-        let test_out = backend
-            .run_batch(artifact_json, &wrapped)
-            .map_err(|e| ConformanceError::BackendExecution {
+        let test_out = backend.run_batch(artifact_json, &wrapped).map_err(|e| {
+            ConformanceError::BackendExecution {
                 sample_idx: idx,
                 detail: e.to_string(),
-            })?;
+            }
+        })?;
 
         let ref_raster = &ref_out[0];
         let test_raster = &test_out[0];
@@ -153,12 +153,18 @@ pub fn run_self_determinism(
     sample: &[Vec<f32>],
 ) -> Result<(), ConformanceError> {
     let wrapped = vec![sample.to_vec()];
-    let run1 = backend
-        .run_batch(artifact_json, &wrapped)
-        .map_err(|e| ConformanceError::BackendExecution { sample_idx: 0, detail: e.to_string() })?;
-    let run2 = backend
-        .run_batch(artifact_json, &wrapped)
-        .map_err(|e| ConformanceError::BackendExecution { sample_idx: 0, detail: e.to_string() })?;
+    let run1 = backend.run_batch(artifact_json, &wrapped).map_err(|e| {
+        ConformanceError::BackendExecution {
+            sample_idx: 0,
+            detail: e.to_string(),
+        }
+    })?;
+    let run2 = backend.run_batch(artifact_json, &wrapped).map_err(|e| {
+        ConformanceError::BackendExecution {
+            sample_idx: 0,
+            detail: e.to_string(),
+        }
+    })?;
 
     let r1 = &run1[0];
     let r2 = &run2[0];

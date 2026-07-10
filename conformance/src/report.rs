@@ -98,13 +98,33 @@ impl ConformanceReport {
         };
 
         writeln!(s, "{border}").ok();
-        writeln!(s, " THRINDEX Conformance Report  [envelope: {}]{draft_notice}", self.envelope_version).ok();
+        writeln!(
+            s,
+            " THRINDEX Conformance Report  [envelope: {}]{draft_notice}",
+            self.envelope_version
+        )
+        .ok();
         writeln!(s, " Backend: {}", self.backend_name).ok();
         writeln!(s, "{border}").ok();
         writeln!(s, " Samples evaluated:      {}", self.n_samples).ok();
-        writeln!(s, " Agg mean rate error:    {:.4e}", self.agg_mean_rate_error).ok();
-        writeln!(s, " Agg max rate error:     {:.4e}", self.agg_max_rate_error).ok();
-        writeln!(s, " Prediction agreement:   {:.2}%", self.pred_agreement * 100.0).ok();
+        writeln!(
+            s,
+            " Agg mean rate error:    {:.4e}",
+            self.agg_mean_rate_error
+        )
+        .ok();
+        writeln!(
+            s,
+            " Agg max rate error:     {:.4e}",
+            self.agg_max_rate_error
+        )
+        .ok();
+        writeln!(
+            s,
+            " Prediction agreement:   {:.2}%",
+            self.pred_agreement * 100.0
+        )
+        .ok();
         writeln!(s, "{sep}").ok();
 
         // Use stored thresholds — the report is self-contained and does not need the
@@ -117,9 +137,17 @@ impl ConformanceReport {
         match self.envelope_status {
             EnvelopeStatus::Draft => {
                 if metrics_pass {
-                    writeln!(s, " WOULD PASS (draft thresholds) — not certification-valid").ok();
+                    writeln!(
+                        s,
+                        " WOULD PASS (draft thresholds) — not certification-valid"
+                    )
+                    .ok();
                 } else {
-                    writeln!(s, " WOULD FAIL (draft thresholds) — not certification-valid").ok();
+                    writeln!(
+                        s,
+                        " WOULD FAIL (draft thresholds) — not certification-valid"
+                    )
+                    .ok();
                 }
             }
             EnvelopeStatus::Final => {

@@ -84,13 +84,26 @@ fn parse_args() -> Option<Args> {
     let mut i = 1;
     while i < raw.len() {
         match raw[i].as_str() {
-            "--artifact" if i + 1 < raw.len() => { artifact = Some(PathBuf::from(&raw[i + 1])); i += 2; }
-            "--data-dir" if i + 1 < raw.len() => { data_dir = Some(PathBuf::from(&raw[i + 1])); i += 2; }
-            "--n-samples" if i + 1 < raw.len() => { n_samples = raw[i + 1].parse().ok()?; i += 2; }
+            "--artifact" if i + 1 < raw.len() => {
+                artifact = Some(PathBuf::from(&raw[i + 1]));
+                i += 2;
+            }
+            "--data-dir" if i + 1 < raw.len() => {
+                data_dir = Some(PathBuf::from(&raw[i + 1]));
+                i += 2;
+            }
+            "--n-samples" if i + 1 < raw.len() => {
+                n_samples = raw[i + 1].parse().ok()?;
+                i += 2;
+            }
             _ => i += 1,
         }
     }
-    Some(Args { artifact: artifact?, data_dir: data_dir?, n_samples })
+    Some(Args {
+        artifact: artifact?,
+        data_dir: data_dir?,
+        n_samples,
+    })
 }
 
 // ─── Rounding ─────────────────────────────────────────────────────────────────
@@ -123,7 +136,11 @@ fn quantize_per_channel_int8(weights: &[f32], out_features: usize) -> Vec<f32> {
         let start = out_n * in_features;
         let row = &weights[start..start + in_features];
         let max_abs = row.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
-        let scale = if max_abs < 1e-12 { 1.0_f32 } else { max_abs / 127.0 };
+        let scale = if max_abs < 1e-12 {
+            1.0_f32
+        } else {
+            max_abs / 127.0
+        };
         for (k, &w) in row.iter().enumerate() {
             let q = round_half_to_even(w / scale).clamp(-127.0, 127.0) as i8;
             out[start + k] = q as f32 * scale;
@@ -146,7 +163,11 @@ fn quantize_per_channel_int4(weights: &[f32], out_features: usize) -> Vec<f32> {
         let start = out_n * in_features;
         let row = &weights[start..start + in_features];
         let max_abs = row.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
-        let scale = if max_abs < 1e-12 { 1.0_f32 } else { max_abs / 7.0 };
+        let scale = if max_abs < 1e-12 {
+            1.0_f32
+        } else {
+            max_abs / 7.0
+        };
         for (k, &w) in row.iter().enumerate() {
             let q = round_half_to_even(w / scale).clamp(-7.0, 7.0) as i8;
             out[start + k] = q as f32 * scale;
@@ -158,7 +179,11 @@ fn quantize_per_channel_int4(weights: &[f32], out_features: usize) -> Vec<f32> {
 /// Per-tensor symmetric int8 (informational — for gap comparison).
 fn quantize_per_tensor_int8(weights: &[f32]) -> Vec<f32> {
     let max_abs = weights.iter().map(|v| v.abs()).fold(0.0f32, f32::max);
-    let scale = if max_abs < 1e-12 { 1.0_f32 } else { max_abs / 127.0 };
+    let scale = if max_abs < 1e-12 {
+        1.0_f32
+    } else {
+        max_abs / 127.0
+    };
     weights
         .iter()
         .map(|&w| {
@@ -188,7 +213,10 @@ where
             other => other.clone(),
         })
         .collect();
-    ResolvedModel { layers, target: model.target.clone() }
+    ResolvedModel {
+        layers,
+        target: model.target.clone(),
+    }
 }
 
 // ─── Frozen fixture loading ───────────────────────────────────────────────────
@@ -225,18 +253,24 @@ fn load_fixtures(data_dir: &PathBuf, n_samples: usize) -> Result<Vec<Fixture>, S
 
     let available = count_available_fixtures(&frozen_dir);
     if available == 0 {
-        return Err(format!("No sample_NNN.json files found in {:?}.", frozen_dir));
+        return Err(format!(
+            "No sample_NNN.json files found in {:?}.",
+            frozen_dir
+        ));
     }
 
-    let to_load = if n_samples == 0 { available } else { n_samples.min(available) };
+    let to_load = if n_samples == 0 {
+        available
+    } else {
+        n_samples.min(available)
+    };
 
     let mut fixtures = Vec::with_capacity(to_load);
     for i in 0..to_load {
         let path = frozen_dir.join(format!("sample_{i:03}.json"));
-        let raw = std::fs::read_to_string(&path)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
-        let v: serde_json::Value = serde_json::from_str(&raw)
-            .map_err(|e| format!("parse {}: {e}", path.display()))?;
+        let raw = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", path.display()))?;
         let label = v["label"].as_u64().ok_or("missing label")? as usize;
 
         // Auto-detect format: sparse_events_v1 (new) or dense "spikes" (legacy).
@@ -295,14 +329,17 @@ fn fixture_fingerprint(fixtures: &[Fixture]) -> String {
 // ─── Distribution helpers ─────────────────────────────────────────────────────
 
 fn percentile(sorted: &[f64], p: f64) -> f64 {
-    if sorted.is_empty() { return 0.0; }
+    if sorted.is_empty() {
+        return 0.0;
+    }
     let idx = ((p / 100.0) * (sorted.len() - 1) as f64).round() as usize;
     sorted[idx.min(sorted.len() - 1)]
 }
 
 fn print_dist(sorted: &[f64], label: &str) {
     println!("    {label}");
-    println!("      p50: {:.4e}   p90: {:.4e}   p95: {:.4e}   p99: {:.4e}   max: {:.4e}",
+    println!(
+        "      p50: {:.4e}   p90: {:.4e}   p95: {:.4e}   p99: {:.4e}   max: {:.4e}",
         percentile(sorted, 50.0),
         percentile(sorted, 90.0),
         percentile(sorted, 95.0),
@@ -313,8 +350,7 @@ fn print_dist(sorted: &[f64], label: &str) {
 
 fn run_sim(model: &ResolvedModel, input: &[Vec<f32>]) -> Vec<Vec<f32>> {
     let config = SimConfig { threads: 1 };
-    let output: SimOutput = sim_run(model, &[input.to_vec()], &config)
-        .expect("sim::run failed");
+    let output: SimOutput = sim_run(model, &[input.to_vec()], &config).expect("sim::run failed");
     output.spikes.into_iter().next().expect("batch size 1")
 }
 
@@ -360,18 +396,27 @@ fn collect_condition(
         per_sample_max_raw.push(max_rate_error(&errors));
         hammings.push(hamming_fraction(ref_r, test_r));
 
-        if prediction(ref_r) == prediction(test_r) { pred_agrees += 1; }
+        if prediction(ref_r) == prediction(test_r) {
+            pred_agrees += 1;
+        }
 
         if !ref_r.is_empty() {
             let n_neurons = ref_r[0].len();
             if n_neurons > 1 {
                 let mut counts: Vec<f64> = (0..n_neurons)
-                    .map(|k| ref_r.iter().map(|f| if f[k] > 0.5 { 1.0 } else { 0.0 }).sum())
+                    .map(|k| {
+                        ref_r
+                            .iter()
+                            .map(|f| if f[k] > 0.5 { 1.0 } else { 0.0 })
+                            .sum()
+                    })
                     .collect();
                 counts.sort_by(|a, b| b.partial_cmp(a).unwrap());
                 if (counts[0] - counts[1]).abs() < 3.0 {
                     boundary_total += 1;
-                    if prediction(ref_r) == prediction(test_r) { boundary_agrees += 1; }
+                    if prediction(ref_r) == prediction(test_r) {
+                        boundary_agrees += 1;
+                    }
                 }
             }
         }
@@ -407,24 +452,53 @@ fn collect_condition(
 }
 
 fn print_condition(label: &str, m: &ConditionMetrics, n_neurons: usize, n_samples: usize) {
-    println!("─── {} ───────────────────────────────────────────────", label);
-    println!("  {} samples × {} output neurons = {} data points",
-        n_samples, n_neurons, m.all_neuron_errors.len());
+    println!(
+        "─── {} ───────────────────────────────────────────────",
+        label
+    );
+    println!(
+        "  {} samples × {} output neurons = {} data points",
+        n_samples,
+        n_neurons,
+        m.all_neuron_errors.len()
+    );
     println!("  Harness aggregates (exact values used by run_conformance):");
-    println!("    agg_mean (mean of per-sample means):  {:.4e}", m.agg_mean);
-    println!("    agg_max  (max  of per-sample maxes):  {:.4e}", m.agg_max);
-    println!("    pred_agree:                            {:.4}  ({:.1}%)",
-        m.pred_agree, m.pred_agree * 100.0);
+    println!(
+        "    agg_mean (mean of per-sample means):  {:.4e}",
+        m.agg_mean
+    );
+    println!(
+        "    agg_max  (max  of per-sample maxes):  {:.4e}",
+        m.agg_max
+    );
+    println!(
+        "    pred_agree:                            {:.4}  ({:.1}%)",
+        m.pred_agree,
+        m.pred_agree * 100.0
+    );
     if let Some(ba) = m.boundary_agree_frac {
-        println!("    boundary-case pred_agree:              {:.4}  ({:.1}%)", ba, ba * 100.0);
+        println!(
+            "    boundary-case pred_agree:              {:.4}  ({:.1}%)",
+            ba,
+            ba * 100.0
+        );
     } else {
         println!("    boundary-case pred_agree:              n/a (no near-tie samples)");
     }
     println!("  Full distributions:");
-    print_dist(&m.all_neuron_errors, "per-neuron error (ALL neurons × ALL samples)");
+    print_dist(
+        &m.all_neuron_errors,
+        "per-neuron error (ALL neurons × ALL samples)",
+    );
     print_dist(&m.per_sample_mean, "per-sample mean_rate_error");
-    print_dist(&m.per_sample_max, "per-sample max_rate_error (worst neuron)");
-    println!("  Hamming (informational): mean={:.4e}  max={:.4e}", m.mean_hamming, m.max_hamming);
+    print_dist(
+        &m.per_sample_max,
+        "per-sample max_rate_error (worst neuron)",
+    );
+    println!(
+        "  Hamming (informational): mean={:.4e}  max={:.4e}",
+        m.mean_hamming, m.max_hamming
+    );
     println!();
 }
 
@@ -447,10 +521,14 @@ struct GapResult {
 }
 
 fn derive_threshold(int8_val: f64, int4_val: f64, gap_frac: f64) -> GapResult {
-    let gap_ratio = if int8_val > 0.0 { int4_val / int8_val } else { f64::INFINITY };
+    let gap_ratio = if int8_val > 0.0 {
+        int4_val / int8_val
+    } else {
+        f64::INFINITY
+    };
     let gap_too_narrow = gap_ratio < 1.2;
     let threshold = if gap_too_narrow || int4_val <= int8_val {
-        int8_val * 1.5  // fallback: 50% headroom above int8 only
+        int8_val * 1.5 // fallback: 50% headroom above int8 only
     } else {
         int8_val + (int4_val - int8_val) * gap_frac
     };
@@ -458,13 +536,34 @@ fn derive_threshold(int8_val: f64, int4_val: f64, gap_frac: f64) -> GapResult {
     let int4_fails = int4_val > threshold;
     let gap_fraction = if (int4_val - int8_val).abs() > 1e-15 {
         (threshold - int8_val) / (int4_val - int8_val)
-    } else { 0.0 };
-    let int8_headroom_pct = if int8_val > 0.0 { (threshold / int8_val - 1.0) * 100.0 } else { 100.0 };
-    let int4_margin_pct = if int4_val > 0.0 { (1.0 - threshold / int4_val) * 100.0 } else { 100.0 };
-    GapResult { threshold, gap_fraction, gap_ratio, int8_headroom_pct, int4_margin_pct, int8_passes, int4_fails, gap_too_narrow }
+    } else {
+        0.0
+    };
+    let int8_headroom_pct = if int8_val > 0.0 {
+        (threshold / int8_val - 1.0) * 100.0
+    } else {
+        100.0
+    };
+    let int4_margin_pct = if int4_val > 0.0 {
+        (1.0 - threshold / int4_val) * 100.0
+    } else {
+        100.0
+    };
+    GapResult {
+        threshold,
+        gap_fraction,
+        gap_ratio,
+        int8_headroom_pct,
+        int4_margin_pct,
+        int8_passes,
+        int4_fails,
+        gap_too_narrow,
+    }
 }
 
-fn check(passes: bool) -> &'static str { if passes { "✓" } else { "✗ PROBLEM" } }
+fn check(passes: bool) -> &'static str {
+    if passes { "✓" } else { "✗ PROBLEM" }
+}
 
 // ─── Unit tests ──────────────────────────────────────────────────────────────
 
@@ -476,17 +575,29 @@ mod tests {
 
     #[test]
     fn round_half_to_even_rounds_down_on_even_floor() {
-        assert_eq!(round_half_to_even(2.5_f32), 2.0, "2.5 must round to 2 (even)");
+        assert_eq!(
+            round_half_to_even(2.5_f32),
+            2.0,
+            "2.5 must round to 2 (even)"
+        );
     }
 
     #[test]
     fn round_half_to_even_rounds_up_on_odd_floor() {
-        assert_eq!(round_half_to_even(3.5_f32), 4.0, "3.5 must round to 4 (even)");
+        assert_eq!(
+            round_half_to_even(3.5_f32),
+            4.0,
+            "3.5 must round to 4 (even)"
+        );
     }
 
     #[test]
     fn round_half_to_even_negative_tie() {
-        assert_eq!(round_half_to_even(-2.5_f32), -2.0, "-2.5 must round to -2 (even)");
+        assert_eq!(
+            round_half_to_even(-2.5_f32),
+            -2.0,
+            "-2.5 must round to -2 (even)"
+        );
     }
 
     #[test]
@@ -521,7 +632,11 @@ mod tests {
         let weights = vec![100.0_f32, 50.0, 0.001_f32, 0.0];
         let q8 = quantize_per_channel_int8(&weights, 2);
         let q8_tensor = quantize_per_tensor_int8(&weights);
-        assert!((q8[2] - 0.001_f32).abs() < 1e-4, "per-channel preserves tiny row: {}", q8[2]);
+        assert!(
+            (q8[2] - 0.001_f32).abs() < 1e-4,
+            "per-channel preserves tiny row: {}",
+            q8[2]
+        );
         assert_eq!(q8_tensor[2], 0.0, "per-tensor crushes tiny row to 0");
     }
 
@@ -532,7 +647,11 @@ mod tests {
         // Row 0: max=0.7, scale=0.7/7=0.1. 0.7/0.1=7.0 → 7 → dq=0.7.
         let weights = vec![0.7_f32, 0.0, 0.35_f32, 0.0];
         let q = quantize_per_channel_int4(&weights, 2);
-        assert!((q[0] - 0.7_f32).abs() < 1e-5, "max weight should round-trip: {}", q[0]);
+        assert!(
+            (q[0] - 0.7_f32).abs() < 1e-5,
+            "max weight should round-trip: {}",
+            q[0]
+        );
     }
 
     #[test]
@@ -550,9 +669,20 @@ mod tests {
         let weights: Vec<f32> = (0..128).map(|i| (i as f32) / 127.0).collect();
         let q8 = quantize_per_channel_int8(&weights, 1);
         let q4 = quantize_per_channel_int4(&weights, 1);
-        let err8: f64 = weights.iter().zip(q8.iter()).map(|(w, q)| (w - q).abs() as f64).sum();
-        let err4: f64 = weights.iter().zip(q4.iter()).map(|(w, q)| (w - q).abs() as f64).sum();
-        assert!(err4 > err8 * 2.0, "int4 must have >2× more error than int8: err4={err4:.4e} err8={err8:.4e}");
+        let err8: f64 = weights
+            .iter()
+            .zip(q8.iter())
+            .map(|(w, q)| (w - q).abs() as f64)
+            .sum();
+        let err4: f64 = weights
+            .iter()
+            .zip(q4.iter())
+            .map(|(w, q)| (w - q).abs() as f64)
+            .sum();
+        assert!(
+            err4 > err8 * 2.0,
+            "int4 must have >2× more error than int8: err4={err4:.4e} err8={err8:.4e}"
+        );
     }
 
     #[test]
@@ -567,20 +697,44 @@ mod tests {
 
     #[test]
     fn fingerprint_is_deterministic() {
-        let f1 = Fixture { raw: "abc".to_string(), spikes: vec![], label: 0 };
-        let f2 = Fixture { raw: "def".to_string(), spikes: vec![], label: 1 };
+        let f1 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let f2 = Fixture {
+            raw: "def".to_string(),
+            spikes: vec![],
+            label: 1,
+        };
         let fp1 = fixture_fingerprint(&[f1, f2]);
-        let f3 = Fixture { raw: "abc".to_string(), spikes: vec![], label: 0 };
-        let f4 = Fixture { raw: "def".to_string(), spikes: vec![], label: 1 };
+        let f3 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
+        let f4 = Fixture {
+            raw: "def".to_string(),
+            spikes: vec![],
+            label: 1,
+        };
         let fp2 = fixture_fingerprint(&[f3, f4]);
         assert_eq!(fp1, fp2);
     }
 
     #[test]
     fn fingerprint_changes_on_content_change() {
-        let f1 = Fixture { raw: "abc".to_string(), spikes: vec![], label: 0 };
+        let f1 = Fixture {
+            raw: "abc".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
         let fp1 = fixture_fingerprint(&[f1]);
-        let f2 = Fixture { raw: "abd".to_string(), spikes: vec![], label: 0 };
+        let f2 = Fixture {
+            raw: "abd".to_string(),
+            spikes: vec![],
+            label: 0,
+        };
         let fp2 = fixture_fingerprint(&[f2]);
         assert_ne!(fp1, fp2);
     }
@@ -618,11 +772,20 @@ fn main() {
     // ── Load artifact ──────────────────────────────────────────────────────────
     let artifact_json = match std::fs::read_to_string(&args.artifact) {
         Ok(s) => s,
-        Err(e) => { eprintln!("E0201: cannot read artifact {}: {e}", args.artifact.display()); std::process::exit(1); }
+        Err(e) => {
+            eprintln!(
+                "E0201: cannot read artifact {}: {e}",
+                args.artifact.display()
+            );
+            std::process::exit(1);
+        }
     };
     let float_model = match load_from_str(&artifact_json) {
         Ok(m) => m,
-        Err(e) => { eprintln!("E0201: artifact parse failed: {e}"); std::process::exit(1); }
+        Err(e) => {
+            eprintln!("E0201: artifact parse failed: {e}");
+            std::process::exit(1);
+        }
     };
 
     // ── Build quantized models ─────────────────────────────────────────────────
@@ -634,7 +797,10 @@ fn main() {
     // ── Load frozen fixtures ───────────────────────────────────────────────────
     let fixtures = match load_fixtures(&args.data_dir, args.n_samples) {
         Ok(f) => f,
-        Err(e) => { eprintln!("Cannot load fixtures: {e}"); std::process::exit(1); }
+        Err(e) => {
+            eprintln!("Cannot load fixtures: {e}");
+            std::process::exit(1);
+        }
     };
 
     let fingerprint = fixture_fingerprint(&fixtures);
@@ -648,8 +814,10 @@ fn main() {
     if args.n_samples == 0 || args.n_samples >= n {
         println!("               (ALL committed fixtures in frozen/)");
     } else {
-        println!("               (WARNING: only {n} of {} available — run without --n-samples to use all)",
-            count_available_fixtures(&args.data_dir.join("frozen")));
+        println!(
+            "               (WARNING: only {n} of {} available — run without --n-samples to use all)",
+            count_available_fixtures(&args.data_dir.join("frozen"))
+        );
     }
     println!(" n_samples:    {n}");
     println!(" comparison:   int8-per-channel (should PASS) vs int4-per-channel (should FAIL)");
@@ -661,7 +829,7 @@ fn main() {
     print!("Running samples");
     std::io::stdout().flush().ok();
 
-    let mut ref_rasters:    Vec<Vec<Vec<f32>>> = Vec::with_capacity(n);
+    let mut ref_rasters: Vec<Vec<Vec<f32>>> = Vec::with_capacity(n);
     let mut int8_ch_rasters: Vec<Vec<Vec<f32>>> = Vec::with_capacity(n);
     let mut int4_ch_rasters: Vec<Vec<Vec<f32>>> = Vec::with_capacity(n);
     let mut int8_ts_rasters: Vec<Vec<Vec<f32>>> = Vec::with_capacity(n);
@@ -671,7 +839,10 @@ fn main() {
         int8_ch_rasters.push(run_sim(&int8_ch_model, &fixture.spikes));
         int4_ch_rasters.push(run_sim(&int4_ch_model, &fixture.spikes));
         int8_ts_rasters.push(run_sim(&int8_ts_model, &fixture.spikes));
-        if (i + 1) % 10 == 0 { print!(" {}", i + 1); std::io::stdout().flush().ok(); }
+        if (i + 1) % 10 == 0 {
+            print!(" {}", i + 1);
+            std::io::stdout().flush().ok();
+        }
     }
     println!(" done.");
     println!();
@@ -679,29 +850,47 @@ fn main() {
     // ── Collect metrics ────────────────────────────────────────────────────────
     let m_int8 = collect_condition(&ref_rasters, &int8_ch_rasters);
     let m_int4 = collect_condition(&ref_rasters, &int4_ch_rasters);
-    let m_ts   = collect_condition(&ref_rasters, &int8_ts_rasters);
+    let m_ts = collect_condition(&ref_rasters, &int8_ts_rasters);
 
     let n_neurons = if !ref_rasters.is_empty() && !ref_rasters[0].is_empty() {
         ref_rasters[0][0].len()
-    } else { 0 };
+    } else {
+        0
+    };
 
     // ── Print distributions ────────────────────────────────────────────────────
-    print_condition("FLOAT vs INT8-PER-CHANNEL  [should PASS]", &m_int8, n_neurons, n);
-    print_condition("FLOAT vs INT4-PER-CHANNEL  [should FAIL]", &m_int4, n_neurons, n);
+    print_condition(
+        "FLOAT vs INT8-PER-CHANNEL  [should PASS]",
+        &m_int8,
+        n_neurons,
+        n,
+    );
+    print_condition(
+        "FLOAT vs INT4-PER-CHANNEL  [should FAIL]",
+        &m_int4,
+        n_neurons,
+        n,
+    );
 
     println!("─── FLOAT vs INT8-PER-TENSOR  [informational] ──────────────────────");
-    println!("  Harness aggregates: agg_mean={:.4e}  agg_max={:.4e}  pred_agree={:.4}",
-        m_ts.agg_mean, m_ts.agg_max, m_ts.pred_agree);
+    println!(
+        "  Harness aggregates: agg_mean={:.4e}  agg_max={:.4e}  pred_agree={:.4}",
+        m_ts.agg_mean, m_ts.agg_max, m_ts.pred_agree
+    );
     print_dist(&m_ts.all_neuron_errors, "per-neuron error");
     print_dist(&m_ts.per_sample_mean, "per-sample mean");
     print_dist(&m_ts.per_sample_max, "per-sample max");
     let ts_ch_p99_ratio = if percentile(&m_int8.all_neuron_errors, 99.0) > 0.0 {
         percentile(&m_ts.all_neuron_errors, 99.0) / percentile(&m_int8.all_neuron_errors, 99.0)
-    } else { f64::INFINITY };
-    println!("  Gap int8-tensor p99 / int8-channel p99 = {:.4e} / {:.4e} = {:.1}×",
+    } else {
+        f64::INFINITY
+    };
+    println!(
+        "  Gap int8-tensor p99 / int8-channel p99 = {:.4e} / {:.4e} = {:.1}×",
         percentile(&m_ts.all_neuron_errors, 99.0),
         percentile(&m_int8.all_neuron_errors, 99.0),
-        ts_ch_p99_ratio);
+        ts_ch_p99_ratio
+    );
     println!();
 
     // ── Gap analysis ───────────────────────────────────────────────────────────
@@ -709,7 +898,7 @@ fn main() {
     const GAP_FRAC: f64 = 0.40;
 
     let t_mean_gap = derive_threshold(m_int8.agg_mean, m_int4.agg_mean, GAP_FRAC);
-    let t_max_gap  = derive_threshold(m_int8.agg_max,  m_int4.agg_max,  GAP_FRAC);
+    let t_max_gap = derive_threshold(m_int8.agg_max, m_int4.agg_max, GAP_FRAC);
 
     // For P_min, we use boundary-case agreement as the conservative anchor (lower bound).
     let int8_pred_anchor = m_int8.boundary_agree_frac.unwrap_or(m_int8.pred_agree);
@@ -726,56 +915,113 @@ fn main() {
         (int8_pred_lower * 0.95).min(0.99)
     };
     let p_min_int8_passes = int8_pred_lower >= p_min;
-    let p_min_int4_fails  = int4_pred_upper <  p_min;
+    let p_min_int4_fails = int4_pred_upper < p_min;
 
     println!("─── GAP ANALYSIS ────────────────────────────────────────────────────");
-    println!("  Thresholds placed {:.0}% into the gap from the int8 side.", GAP_FRAC * 100.0);
-    println!("  (int8 gets {:.0}% of gap as headroom; int4 gets {:.0}% as failure margin)",
-        (1.0 - GAP_FRAC) * 100.0, GAP_FRAC * 100.0);
+    println!(
+        "  Thresholds placed {:.0}% into the gap from the int8 side.",
+        GAP_FRAC * 100.0
+    );
+    println!(
+        "  (int8 gets {:.0}% of gap as headroom; int4 gets {:.0}% as failure margin)",
+        (1.0 - GAP_FRAC) * 100.0,
+        GAP_FRAC * 100.0
+    );
     println!();
 
     println!("  T_MEAN  (harness uses: mean of per-sample mean_rate_errors)");
-    println!("    int8 agg_mean = {:.4e}   (must be ≤ T_mean for int8 to PASS)", m_int8.agg_mean);
-    println!("    int4 agg_mean = {:.4e}   (must be >  T_mean for int4 to FAIL)", m_int4.agg_mean);
+    println!(
+        "    int8 agg_mean = {:.4e}   (must be ≤ T_mean for int8 to PASS)",
+        m_int8.agg_mean
+    );
+    println!(
+        "    int4 agg_mean = {:.4e}   (must be >  T_mean for int4 to FAIL)",
+        m_int4.agg_mean
+    );
     println!("    Ratio int4/int8 = {:.2}×", t_mean_gap.gap_ratio);
     if t_mean_gap.gap_too_narrow {
         println!("    ⚠ GAP TOO NARROW — int4 and int8 are too close; cannot draw a clean line.");
-        println!("      Falling back to int8_agg_mean × 1.5 = {:.4e}.", t_mean_gap.threshold);
+        println!(
+            "      Falling back to int8_agg_mean × 1.5 = {:.4e}.",
+            t_mean_gap.threshold
+        );
     } else {
-        println!("    Gap candidate: {:.4e} + {:.4e} × {:.2} = {:.4e}",
-            m_int8.agg_mean, m_int4.agg_mean - m_int8.agg_mean, GAP_FRAC, t_mean_gap.threshold);
-        println!("    int8 headroom:  +{:.1}%  (threshold / int8_agg_mean - 1)", t_mean_gap.int8_headroom_pct);
-        println!("    int4 margin:    -{:.1}%  (1 - threshold / int4_agg_mean)", t_mean_gap.int4_margin_pct);
+        println!(
+            "    Gap candidate: {:.4e} + {:.4e} × {:.2} = {:.4e}",
+            m_int8.agg_mean,
+            m_int4.agg_mean - m_int8.agg_mean,
+            GAP_FRAC,
+            t_mean_gap.threshold
+        );
+        println!(
+            "    int8 headroom:  +{:.1}%  (threshold / int8_agg_mean - 1)",
+            t_mean_gap.int8_headroom_pct
+        );
+        println!(
+            "    int4 margin:    -{:.1}%  (1 - threshold / int4_agg_mean)",
+            t_mean_gap.int4_margin_pct
+        );
     }
-    println!("    {} int8 PASSES  {} int4 FAILS",
-        check(t_mean_gap.int8_passes), check(t_mean_gap.int4_fails));
+    println!(
+        "    {} int8 PASSES  {} int4 FAILS",
+        check(t_mean_gap.int8_passes),
+        check(t_mean_gap.int4_fails)
+    );
     println!();
 
     println!("  T_MAX   (harness uses: max of per-sample max_rate_errors across all samples)");
-    println!("    int8 agg_max  = {:.4e}   (must be ≤ T_max for int8 to PASS)", m_int8.agg_max);
-    println!("    int4 agg_max  = {:.4e}   (must be >  T_max for int4 to FAIL)", m_int4.agg_max);
+    println!(
+        "    int8 agg_max  = {:.4e}   (must be ≤ T_max for int8 to PASS)",
+        m_int8.agg_max
+    );
+    println!(
+        "    int4 agg_max  = {:.4e}   (must be >  T_max for int4 to FAIL)",
+        m_int4.agg_max
+    );
     println!("    Ratio int4/int8 = {:.2}×", t_max_gap.gap_ratio);
     if t_max_gap.gap_too_narrow {
         println!("    ⚠ GAP TOO NARROW for T_max. int8 barely passes; int4 barely fails.");
-        println!("      Candidate: {:.4e} (int8_agg_max × 1.5 fallback).", t_max_gap.threshold);
+        println!(
+            "      Candidate: {:.4e} (int8_agg_max × 1.5 fallback).",
+            t_max_gap.threshold
+        );
     } else {
-        println!("    Gap candidate: {:.4e} + {:.4e} × {:.2} = {:.4e}",
-            m_int8.agg_max, m_int4.agg_max - m_int8.agg_max, GAP_FRAC, t_max_gap.threshold);
+        println!(
+            "    Gap candidate: {:.4e} + {:.4e} × {:.2} = {:.4e}",
+            m_int8.agg_max,
+            m_int4.agg_max - m_int8.agg_max,
+            GAP_FRAC,
+            t_max_gap.threshold
+        );
         println!("    int8 headroom:  +{:.1}%", t_max_gap.int8_headroom_pct);
         println!("    int4 margin:    -{:.1}%", t_max_gap.int4_margin_pct);
     }
-    println!("    {} int8 PASSES  {} int4 FAILS",
-        check(t_max_gap.int8_passes), check(t_max_gap.int4_fails));
+    println!(
+        "    {} int8 PASSES  {} int4 FAILS",
+        check(t_max_gap.int8_passes),
+        check(t_max_gap.int4_fails)
+    );
     println!();
 
     println!("  P_MIN   (harness uses: prediction_agreement fraction)");
-    println!("    int8 overall={:.4}  boundary={:.4}  anchor={:.4}",
-        m_int8.pred_agree, m_int8.boundary_agree_frac.unwrap_or(f64::NAN), int8_pred_lower);
-    println!("    int4 overall={:.4}  boundary={:.4}  anchor={:.4}",
-        m_int4.pred_agree, m_int4.boundary_agree_frac.unwrap_or(f64::NAN), int4_pred_upper);
+    println!(
+        "    int8 overall={:.4}  boundary={:.4}  anchor={:.4}",
+        m_int8.pred_agree,
+        m_int8.boundary_agree_frac.unwrap_or(f64::NAN),
+        int8_pred_lower
+    );
+    println!(
+        "    int4 overall={:.4}  boundary={:.4}  anchor={:.4}",
+        m_int4.pred_agree,
+        m_int4.boundary_agree_frac.unwrap_or(f64::NAN),
+        int4_pred_upper
+    );
     println!("    Candidate P_min = {:.4}", p_min);
-    println!("    {} int8 PASSES  {} int4 FAILS",
-        check(p_min_int8_passes), check(p_min_int4_fails));
+    println!(
+        "    {} int8 PASSES  {} int4 FAILS",
+        check(p_min_int8_passes),
+        check(p_min_int4_fails)
+    );
     println!();
 
     // ── Recommended thresholds ────────────────────────────────────────────────
@@ -790,27 +1036,54 @@ fn main() {
     println!("  Scope: one reference model (SHD 64.66%, Dense 700→512→20). v0 envelope.");
     println!();
     println!("  T_mean_threshold = {:.4e}", t_mean_gap.threshold);
-    println!("    {} int8 agg_mean = {:.4e}  ≤  {:.4e} → PASSES",
-        check(t_mean_gap.int8_passes), m_int8.agg_mean, t_mean_gap.threshold);
-    println!("    {} int4 agg_mean = {:.4e}  >  {:.4e} → FAILS",
-        check(t_mean_gap.int4_fails), m_int4.agg_mean, t_mean_gap.threshold);
+    println!(
+        "    {} int8 agg_mean = {:.4e}  ≤  {:.4e} → PASSES",
+        check(t_mean_gap.int8_passes),
+        m_int8.agg_mean,
+        t_mean_gap.threshold
+    );
+    println!(
+        "    {} int4 agg_mean = {:.4e}  >  {:.4e} → FAILS",
+        check(t_mean_gap.int4_fails),
+        m_int4.agg_mean,
+        t_mean_gap.threshold
+    );
     println!();
     println!("  T_max_threshold  = {:.4e}", t_max_gap.threshold);
-    println!("    {} int8 agg_max  = {:.4e}  ≤  {:.4e} → PASSES",
-        check(t_max_gap.int8_passes), m_int8.agg_max, t_max_gap.threshold);
-    println!("    {} int4 agg_max  = {:.4e}  >  {:.4e} → FAILS",
-        check(t_max_gap.int4_fails), m_int4.agg_max, t_max_gap.threshold);
+    println!(
+        "    {} int8 agg_max  = {:.4e}  ≤  {:.4e} → PASSES",
+        check(t_max_gap.int8_passes),
+        m_int8.agg_max,
+        t_max_gap.threshold
+    );
+    println!(
+        "    {} int4 agg_max  = {:.4e}  >  {:.4e} → FAILS",
+        check(t_max_gap.int4_fails),
+        m_int4.agg_max,
+        t_max_gap.threshold
+    );
     println!();
     println!("  pred_agreement_min = {:.4}", p_min);
-    println!("    {} int8 pred_agree = {:.4}  ≥  {:.4} → PASSES",
-        check(p_min_int8_passes), int8_pred_lower, p_min);
-    println!("    {} int4 pred_agree = {:.4}  <  {:.4} → FAILS",
-        check(p_min_int4_fails), int4_pred_upper, p_min);
+    println!(
+        "    {} int8 pred_agree = {:.4}  ≥  {:.4} → PASSES",
+        check(p_min_int8_passes),
+        int8_pred_lower,
+        p_min
+    );
+    println!(
+        "    {} int4 pred_agree = {:.4}  <  {:.4} → FAILS",
+        check(p_min_int4_fails),
+        int4_pred_upper,
+        p_min
+    );
     println!();
 
-    let overall_ok = t_mean_gap.int8_passes && t_mean_gap.int4_fails
-        && t_max_gap.int8_passes && t_max_gap.int4_fails
-        && p_min_int8_passes && p_min_int4_fails;
+    let overall_ok = t_mean_gap.int8_passes
+        && t_mean_gap.int4_fails
+        && t_max_gap.int8_passes
+        && t_max_gap.int4_fails
+        && p_min_int8_passes
+        && p_min_int4_fails;
     if overall_ok {
         println!("  ✓ All six conditions satisfied — clean int8/int4 separation.");
         println!("    The above thresholds are suitable for ADR-0010 Part II Amendment.");
@@ -824,15 +1097,33 @@ fn main() {
     let draft = &conformance::CONFORMANCE_ENVELOPE_V0_DRAFT;
     println!("─── Comparison with CONFORMANCE_ENVELOPE_v0_DRAFT ──────────────────");
     println!("                     INT8 measured   DRAFT   Status");
-    let s_mean = if m_int8.agg_mean <= draft.t_mean_threshold { "OK" } else { "EXCEEDS" };
-    let s_max  = if m_int8.agg_max  <= draft.t_max_threshold  { "OK" } else { "EXCEEDS" };
-    let s_pred = if m_int8.pred_agree >= draft.pred_agreement_min { "OK" } else { "BELOW" };
-    println!("  agg_mean:          {:.4e}       {:.4e}   {}",
-        m_int8.agg_mean, draft.t_mean_threshold, s_mean);
-    println!("  agg_max:           {:.4e}       {:.4e}   {}",
-        m_int8.agg_max, draft.t_max_threshold, s_max);
-    println!("  pred_agree:        {:.4}         {:.4}   {}",
-        m_int8.pred_agree, draft.pred_agreement_min, s_pred);
+    let s_mean = if m_int8.agg_mean <= draft.t_mean_threshold {
+        "OK"
+    } else {
+        "EXCEEDS"
+    };
+    let s_max = if m_int8.agg_max <= draft.t_max_threshold {
+        "OK"
+    } else {
+        "EXCEEDS"
+    };
+    let s_pred = if m_int8.pred_agree >= draft.pred_agreement_min {
+        "OK"
+    } else {
+        "BELOW"
+    };
+    println!(
+        "  agg_mean:          {:.4e}       {:.4e}   {}",
+        m_int8.agg_mean, draft.t_mean_threshold, s_mean
+    );
+    println!(
+        "  agg_max:           {:.4e}       {:.4e}   {}",
+        m_int8.agg_max, draft.t_max_threshold, s_max
+    );
+    println!(
+        "  pred_agree:        {:.4}         {:.4}   {}",
+        m_int8.pred_agree, draft.pred_agreement_min, s_pred
+    );
     println!();
     println!("NOTE: This output does not constitute certification.");
     println!("ADR-0010 Part II must be amended by the founder before any backend");

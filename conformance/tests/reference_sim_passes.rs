@@ -7,8 +7,7 @@
 //! `v0_envelope_constants`) asserts that the constants haven't drifted without
 //! a corresponding RFC amendment — this is the CI enforcement of ADR-0010 Part I §9.
 use conformance::{
-    CONFORMANCE_ENVELOPE_V0,
-    CONFORMANCE_ENVELOPE_V0_DRAFT,
+    CONFORMANCE_ENVELOPE_V0, CONFORMANCE_ENVELOPE_V0_DRAFT,
     harness::{run_conformance, run_self_determinism},
     metric::{
         hamming_fraction, max_rate_error, mean_rate_error, per_neuron_rate_errors,
@@ -33,12 +32,16 @@ fn reference_vs_itself_is_zero() {
     let input = vec![vec![0.0f32; 2]; 2];
     let wrapped = vec![input.clone()];
 
-    let ref_out = reference.run_batch(MINIMAL_ARTIFACT, &wrapped)
+    let ref_out = reference
+        .run_batch(MINIMAL_ARTIFACT, &wrapped)
         .expect("reference run failed");
     let raster = &ref_out[0];
 
     let errors = per_neuron_rate_errors(raster, raster);
-    assert!(errors.iter().all(|&e| e == 0.0), "self-distance must be 0: {errors:?}");
+    assert!(
+        errors.iter().all(|&e| e == 0.0),
+        "self-distance must be 0: {errors:?}"
+    );
     assert_eq!(mean_rate_error(&errors), 0.0);
     assert_eq!(max_rate_error(&errors), 0.0);
 
@@ -65,8 +68,12 @@ fn reference_deterministic_across_thread_counts() {
     let single = SimBackend::new(1);
     let multi = SimBackend::new(4);
 
-    let out1 = single.run_batch(MINIMAL_ARTIFACT, &wrapped).expect("single-thread failed");
-    let out4 = multi.run_batch(MINIMAL_ARTIFACT, &wrapped).expect("multi-thread failed");
+    let out1 = single
+        .run_batch(MINIMAL_ARTIFACT, &wrapped)
+        .expect("single-thread failed");
+    let out4 = multi
+        .run_batch(MINIMAL_ARTIFACT, &wrapped)
+        .expect("multi-thread failed");
 
     assert_eq!(out1, out4, "thread count must not affect output (ADR-0007)");
 }
@@ -78,8 +85,16 @@ fn reference_deterministic_across_thread_counts() {
 #[test]
 fn draft_envelope_is_labeled_draft() {
     let env = &CONFORMANCE_ENVELOPE_V0_DRAFT;
-    assert_eq!(env.status, EnvelopeStatus::Draft, "DRAFT envelope must have Draft status");
-    assert!(env.version.contains("draft"), "DRAFT version string must contain 'draft': {}", env.version);
+    assert_eq!(
+        env.status,
+        EnvelopeStatus::Draft,
+        "DRAFT envelope must have Draft status"
+    );
+    assert!(
+        env.version.contains("draft"),
+        "DRAFT version string must contain 'draft': {}",
+        env.version
+    );
     assert_eq!(env.min_test_samples, 100, "min_test_samples must be 100");
 }
 
@@ -91,9 +106,18 @@ fn v0_envelope_constants() {
     let env = &CONFORMANCE_ENVELOPE_V0;
     assert_eq!(env.status, EnvelopeStatus::Final, "V0 must be Final");
     assert_eq!(env.version, "v0");
-    assert_eq!(env.t_mean_threshold, 0.020, "T_mean must be 0.020 (ADR-0010 Part II Amendment)");
-    assert_eq!(env.t_max_threshold, 0.130, "T_max must be 0.130 (ADR-0010 Part II Amendment)");
-    assert_eq!(env.pred_agreement_min, 0.900, "P_min must be 0.900 (ADR-0010 Part II Amendment)");
+    assert_eq!(
+        env.t_mean_threshold, 0.020,
+        "T_mean must be 0.020 (ADR-0010 Part II Amendment)"
+    );
+    assert_eq!(
+        env.t_max_threshold, 0.130,
+        "T_max must be 0.130 (ADR-0010 Part II Amendment)"
+    );
+    assert_eq!(
+        env.pred_agreement_min, 0.900,
+        "P_min must be 0.900 (ADR-0010 Part II Amendment)"
+    );
     assert_eq!(env.min_test_samples, 100);
 }
 
@@ -135,9 +159,7 @@ fn draft_envelope_never_certifies() {
 fn v0_envelope_certifies_reference_sim() {
     // Use 100 identical minimal inputs to satisfy min_test_samples=100.
     // Reference vs itself gives zero error regardless of content.
-    let inputs: Vec<Vec<Vec<f32>>> = (0..100)
-        .map(|_| vec![vec![0.0f32; 2]; 2])
-        .collect();
+    let inputs: Vec<Vec<Vec<f32>>> = (0..100).map(|_| vec![vec![0.0f32; 2]; 2]).collect();
 
     let reference = SimBackend::new(1);
     let backend = SimBackend::new(1);
@@ -151,9 +173,18 @@ fn v0_envelope_certifies_reference_sim() {
     )
     .expect("conformance run must succeed");
 
-    assert_eq!(report.agg_mean_rate_error, 0.0, "float ref vs itself: zero mean error");
-    assert_eq!(report.agg_max_rate_error, 0.0, "float ref vs itself: zero max error");
-    assert_eq!(report.pred_agreement, 1.0, "float ref vs itself: perfect prediction agreement");
+    assert_eq!(
+        report.agg_mean_rate_error, 0.0,
+        "float ref vs itself: zero mean error"
+    );
+    assert_eq!(
+        report.agg_max_rate_error, 0.0,
+        "float ref vs itself: zero max error"
+    );
+    assert_eq!(
+        report.pred_agreement, 1.0,
+        "float ref vs itself: perfect prediction agreement"
+    );
 
     assert!(
         report.passed(&CONFORMANCE_ENVELOPE_V0),
