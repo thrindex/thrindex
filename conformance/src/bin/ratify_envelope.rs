@@ -214,8 +214,8 @@ fn load_fixtures(data_dir: &PathBuf, n_samples: usize) -> Result<Vec<Fixture>, S
     if !frozen_dir.exists() {
         return Err(format!(
             "Frozen fixture directory {:?} not found.\n\
-             Run `scripts/freeze_shd_fixtures.py --data-dir {:?} --n-samples {n_samples}` \
-             first (ADR-0010 Part II Step 1).",
+             Run `uv run python scripts/freeze_shd_fixtures.py \
+             --data-dir /tmp/shd --out-dir {:?}` first (ADR-0010 Part II Step 1).",
             frozen_dir, data_dir
         ));
     }
@@ -227,18 +227,46 @@ fn load_fixtures(data_dir: &PathBuf, n_samples: usize) -> Result<Vec<Fixture>, S
         let v: serde_json::Value = serde_json::from_str(&raw)
             .map_err(|e| format!("parse {}: {e}", path.display()))?;
         let label = v["label"].as_u64().ok_or("missing label")? as usize;
-        let spikes: Vec<Vec<f32>> = v["spikes"]
-            .as_array()
-            .ok_or("missing spikes")?
-            .iter()
-            .map(|row| {
-                row.as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .map(|x| x.as_f64().unwrap_or(0.0) as f32)
-                    .collect()
-            })
-            .collect();
+
+        // Auto-detect format: sparse_events_v1 (new) or dense "spikes" (legacy).
+        let spikes: Vec<Vec<f32>> = if v["events"].is_array() {
+            // Sparse events format (sparse_events_v1): [[t, u], ...]
+            let t_size = v["T"].as_u64().unwrap_or(100) as usize;
+            let n_in = v["N_in"].as_u64().unwrap_or(700) as usize;
+            let mut dense = vec![vec![0.0f32; n_in]; t_size];
+            if let Some(events) = v["events"].as_array() {
+                for event in events {
+                    if let Some(pair) = event.as_array()
+                        && pair.len() == 2
+                    {
+                        let t = pair[0].as_u64().unwrap_or(0) as usize;
+                        let u = pair[1].as_u64().unwrap_or(0) as usize;
+                        if t < t_size && u < n_in {
+                            dense[t][u] = 1.0;
+                        }
+                    }
+                }
+            }
+            dense
+        } else if let Some(spikes_arr) = v["spikes"].as_array() {
+            // Dense format (legacy, backward-compatible).
+            spikes_arr
+                .iter()
+                .map(|row| {
+                    row.as_array()
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .map(|x| x.as_f64().unwrap_or(0.0) as f32)
+                        .collect()
+                })
+                .collect()
+        } else {
+            return Err(format!(
+                "{}: expected either 'events' (sparse_events_v1) or 'spikes' (dense) field",
+                path.display()
+            ));
+        };
+
         fixtures.push(Fixture { raw, spikes, label });
     }
     Ok(fixtures)
