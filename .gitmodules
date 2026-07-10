@@ -1,0 +1,3 @@
+[submodule "thrindex-docs"]
+	path = thrindex-docs
+	url = https://github.com/thrindex/thrindex-docs
