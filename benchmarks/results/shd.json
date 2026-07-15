@@ -1,0 +1,125 @@
+{
+  "benchmark": "shd-keyword-spotting",
+  "run_at": "2026-07-15T21:48:50.142852+00:00",
+  "model": {
+    "architecture": "Dense(700,512) \u2192 LIF(\u03c4=20ms) \u2192 Dense(512,20) \u2192 LIF(\u03c4=20ms)",
+    "timesteps": 100,
+    "n_samples": 3
+  },
+  "energy_coefficients": {
+    "snn_pj_per_syn_op": 0.5,
+    "mlp_gpu_pj_per_mac": 2.56,
+    "mlp_cpu_pj_per_mac": 1.0,
+    "snn_reference": "7nm neuromorphic silicon (consistent with published figures)",
+    "gpu_reference": "NVIDIA A100 \u2014 400W TDP / (2 \u00d7 156 TMAC/s) \u2248 2.56 pJ/MAC",
+    "cpu_reference": "ARM Cortex class CPU \u2014 1.0 pJ/MAC (conservative 7nm estimate)"
+  },
+  "snn": {
+    "per_sample": [
+      {
+        "sample": 0,
+        "syn_ops": 4126204,
+        "firing_rate": 0.1119,
+        "energy_nj": 2063.102,
+        "wall_ms": 14.181
+      },
+      {
+        "sample": 1,
+        "syn_ops": 3936120,
+        "firing_rate": 0.1068,
+        "energy_nj": 1968.06,
+        "wall_ms": 14.312
+      },
+      {
+        "sample": 2,
+        "syn_ops": 2932308,
+        "firing_rate": 0.0795,
+        "energy_nj": 1466.154,
+        "wall_ms": 14.306
+      }
+    ],
+    "avg": {
+      "syn_ops": 3664877,
+      "firing_rate": 0.0994,
+      "energy_nj": 1832.439,
+      "wall_ms": 14.266
+    }
+  },
+  "mlp_rate_collapsed": {
+    "description": "Single forward pass on mean spike rates \u2014 same params, loses temporal structure",
+    "macs": 368640,
+    "per_sample": [
+      {
+        "sample": 0,
+        "macs": 368640,
+        "energy_gpu_nj": 943.718,
+        "energy_cpu_nj": 368.64,
+        "wall_ms": 0.0121
+      },
+      {
+        "sample": 1,
+        "macs": 368640,
+        "energy_gpu_nj": 943.718,
+        "energy_cpu_nj": 368.64,
+        "wall_ms": 0.0122
+      },
+      {
+        "sample": 2,
+        "macs": 368640,
+        "energy_gpu_nj": 943.718,
+        "energy_cpu_nj": 368.64,
+        "wall_ms": 0.0118
+      }
+    ],
+    "avg": {
+      "energy_gpu_nj": 943.718,
+      "energy_cpu_nj": 368.64,
+      "wall_ms": 0.012
+    }
+  },
+  "mlp_temporal": {
+    "description": "100 sequential forward passes \u2014 same temporal information as SNN",
+    "macs": 36864000,
+    "per_sample": [
+      {
+        "sample": 0,
+        "macs": 36864000,
+        "energy_gpu_nj": 94371.84,
+        "energy_cpu_nj": 36864.0,
+        "wall_ms": 1.192
+      },
+      {
+        "sample": 1,
+        "macs": 36864000,
+        "energy_gpu_nj": 94371.84,
+        "energy_cpu_nj": 36864.0,
+        "wall_ms": 1.191
+      },
+      {
+        "sample": 2,
+        "macs": 36864000,
+        "energy_gpu_nj": 94371.84,
+        "energy_cpu_nj": 36864.0,
+        "wall_ms": 1.183
+      }
+    ],
+    "avg": {
+      "energy_gpu_nj": 94371.84,
+      "energy_cpu_nj": 36864.0,
+      "wall_ms": 1.189
+    }
+  },
+  "energy_ratios": {
+    "temporal_mlp_gpu_vs_snn": 51.5,
+    "temporal_mlp_cpu_vs_snn": 20.12,
+    "rate_mlp_gpu_vs_snn": 0.52,
+    "note": "temporal_mlp_*_vs_snn is the apples-to-apples comparison (same temporal information processed). rate_mlp_*_vs_snn is NOT apples-to-apples (MLP discards temporal structure)."
+  },
+  "device": {
+    "python": "3.14.5",
+    "torch": "2.13.0",
+    "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "cpu": "arm"
+  },
+  "methodology": "see benchmarks/METHODOLOGY.md"
+}
