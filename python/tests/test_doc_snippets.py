@@ -21,14 +21,12 @@ from __future__ import annotations
 
 import json
 import math
-import tempfile
 from pathlib import Path
 
 import pytest
 import thrindex
 import thrindex.snn as snn
 import torch
-from thrindex.compile import compile_model
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -38,14 +36,6 @@ def _require_core() -> None:
         importlib.import_module("thrindex._core")
     except ImportError:
         pytest.skip("thrindex._core not built — run `maturin develop`")
-
-
-def _compile_to_tmp(model: snn.Sequential) -> Path:
-    """Compile *model* to a temp file; return the path."""
-    _require_core()
-    tmp = Path(tempfile.mktemp(suffix=".thx"))
-    compile_model(model, tmp)
-    return tmp
 
 
 # ── getting-started/quickstart.mdx ────────────────────────────────────────────
@@ -108,7 +98,7 @@ class TestQuickstart:
 
         # Provide one zero-spike input sample: [1 batch, T=100, N_IN=700]
         input_spikes = [[[0.0] * 700 for _ in range(100)]]
-        spikes, stats, transcript = run_sim(str(output), input_spikes, 1, 0)
+        _spikes, _stats, transcript = run_sim(str(output), input_spikes, 1, 0)
 
         assert isinstance(transcript, str)
         assert len(transcript) > 0
