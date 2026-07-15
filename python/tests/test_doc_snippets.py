@@ -25,12 +25,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import torch
-
 import thrindex
 import thrindex.snn as snn
+import torch
 from thrindex.compile import compile_model
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -57,9 +55,6 @@ class TestQuickstart:
 
     def test_model_build(self) -> None:
         """The exact 4-layer quickstart model must construct without error."""
-        import thrindex as thx  # noqa: PLC0415 — mirrors the doc import style
-        import thrindex.snn as snn  # noqa: PLC0415
-
         model = snn.Sequential(
             snn.Dense(700, 512),
             snn.LIF(tau_mem=20.0, threshold=0.3),
