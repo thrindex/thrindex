@@ -153,9 +153,11 @@ Rust engines are MIT/Apache-2.0. The Python SDK wraps them with no logic of its 
 
 ---
 
-## Contributing
+## Status
 
-thrindex is in active early development (M1). Issues and discussions are open.  
+M5 complete — templates, public docs, CI snippet tests, conformance suite, and energy benchmark harness are all shipped. M6 (first silicon bring-up) is next.
+
+Issues and discussions are open.  
 See [SECURITY.md](SECURITY.md) for responsible disclosure.
 
 ---
