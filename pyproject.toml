@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "thrindex"
 version = "0.3.0"  # single source of truth; __init__.py reads this via importlib.metadata
-description = "The neuromorphic infrastructure SDK"
+description = "The open compiler for spiking neuromorphic compute."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
@@ -14,6 +14,12 @@ dependencies = [
     # training requires torch.autograd. No alternative exists in this stack.
     "torch>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://thrindex.com"
+Documentation = "https://docs.thrindex.com"
+Source = "https://github.com/thrindex/thrindex"
+"Bug Tracker" = "https://github.com/thrindex/thrindex/issues"
 
 [project.scripts]
 # Thin Python wrapper — delegates all computation to thrindex._core (PyO3).

@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://thrindex.com">
-  <img src="docs/assets/banner.png" width="800px" alt="Thrindex — The open compiler for spiking neuromorphic compute"/>
+  <img src="https://raw.githubusercontent.com/thrindex/thrindex/main/docs/assets/banner.png" width="800px" alt="Thrindex — The open compiler for spiking neuromorphic compute"/>
 </a>
 
 <br/>
