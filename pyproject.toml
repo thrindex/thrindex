@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "thrindex"
-version = "0.2.0"  # single source of truth; __init__.py reads this via importlib.metadata
+version = "0.3.0"  # single source of truth; __init__.py reads this via importlib.metadata
 description = "The neuromorphic infrastructure SDK"
 readme = "README.md"
 license = { file = "LICENSE" }

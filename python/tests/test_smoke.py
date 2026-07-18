@@ -29,10 +29,10 @@ def test_version_is_semver_shaped() -> None:
     )
 
 
-def test_version_is_0_2_0() -> None:
-    """Pin the exact M2 version, proving single-source derivation from pyproject.toml."""
-    assert thrindex.__version__ == "0.2.0", (
-        f"Expected '0.2.0', got {thrindex.__version__!r}. "
+def test_version_is_0_3_0() -> None:
+    """Pin the exact M5 version, proving single-source derivation from pyproject.toml."""
+    assert thrindex.__version__ == "0.3.0", (
+        f"Expected '0.3.0', got {thrindex.__version__!r}. "
         "Update pyproject.toml [project] version — that is the only place."
     )
 
