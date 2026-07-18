@@ -39,6 +39,8 @@ python-source = "python"
 module-name = "thrindex._core"
 manifest-path = "crates/thrindex-py/Cargo.toml"
 features = ["pyo3/extension-module"]
+# Exclude dev-only directories from the published wheel.
+exclude = ["python/tests/**", "python/examples/**"]
 
 [tool.ruff]
 line-length = 100
