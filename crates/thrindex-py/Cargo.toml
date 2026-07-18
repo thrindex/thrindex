@@ -1,6 +1,6 @@
 [package]
 name = "thrindex-py"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 description = "Thin PyO3 extension module — zero SNN logic; all computation in core crates"
 license = "Apache-2.0"
