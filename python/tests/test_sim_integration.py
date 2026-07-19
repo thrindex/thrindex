@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import thrindex
 import thrindex.snn as snn
 import torch
 from thrindex.compile import compile_model
@@ -63,7 +64,11 @@ class TestCompileAndRun:
         g.manual_seed(0)
         spikes = torch.bernoulli(torch.full((1, 10, 8), 0.3), generator=g).tolist()
         _, _, transcript = run_sim(artifact, spikes, 1, 0)
-        assert "0.2.0" in transcript
+        # Transcript version comes from thrindex-py CARGO_PKG_VERSION, which must
+        # match the Python package version (single release identity).
+        assert thrindex.__version__ in transcript, (
+            f"expected package version {thrindex.__version__!r} in transcript:\n{transcript}"
+        )
 
     def test_transcript_contains_target_sim(self, tmp_path: Path) -> None:
         _require_core()
