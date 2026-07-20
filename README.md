@@ -18,7 +18,7 @@ Author spiking neural networks in Python. Compile them to neuromorphic hardware.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/thrindex/thrindex/ci.yml?label=CI&color=0066FF)](https://github.com/thrindex/thrindex/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/thrindex?color=0066FF&label=python)](https://pypi.org/project/thrindex/)
-[![Downloads](https://img.shields.io/pepy/dt/thrindex?color=0066FF&label=downloads)](https://pepy.tech/projects/thrindex)
+[![Downloads](https://static.pepy.tech/personalized-badge/thrindex?period=total&units=INTERNATIONAL_SYSTEM&left_color=grey&right_color=0066FF&left_text=downloads)](https://pepy.tech/projects/thrindex)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-0066FF.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-0066FF.svg)](https://www.python.org/)
 
