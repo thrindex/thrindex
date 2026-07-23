@@ -4,11 +4,40 @@ build-backend = "maturin"
 
 [project]
 name = "thrindex"
-version = "0.3.3"  # single source of truth; __init__.py reads this via importlib.metadata
+version = "0.3.4"  # single source of truth; __init__.py reads this via importlib.metadata
 description = "The open compiler for spiking neuromorphic compute."
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+authors = [
+    { name = "Theodoros Nomikos", email = "hello@thrindex.com" },
+]
+keywords = [
+    "neuromorphic",
+    "spiking-neural-networks",
+    "snn",
+    "compiler",
+    "pytorch",
+    "edge-ai",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Compilers",
+    "Typing :: Typed",
+]
 dependencies = [
     # Justification (§12): SNN layers are nn.Module subclasses; surrogate gradient
     # training requires torch.autograd. No alternative exists in this stack.
@@ -18,8 +47,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://thrindex.com"
 Documentation = "https://docs.thrindex.com"
-Source = "https://github.com/thrindex/thrindex"
-"Bug Tracker" = "https://github.com/thrindex/thrindex/issues"
+Repository = "https://github.com/thrindex/thrindex"
+Issues = "https://github.com/thrindex/thrindex/issues"
 
 [project.scripts]
 # Thin Python wrapper — delegates all computation to thrindex._core (PyO3).

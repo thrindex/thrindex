@@ -701,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "thrindex-py"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "pyo3",
  "thrindex-compiler",
