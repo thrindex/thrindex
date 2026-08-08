@@ -23,7 +23,7 @@ required-features = ["hardware"]
 
 [dependencies]
 # Justification (§12): Backend trait, Capability, BackendError contract.
-thrindex-backend-api = { path = "../../thrindex-backend-api" }
+thrindex-backend-api = { path = "../../thrindex-backend-api", version = "0.4.0" }
 # Justification (§12): typed errors with minimal boilerplate.
 thiserror = "2"
 # Justification (§12): JSON parsing of raw .thx artifact string for layer validation;
