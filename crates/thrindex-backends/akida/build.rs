@@ -113,7 +113,7 @@ fn main() {
         )
     });
 
-    lib_name = if found
+    let lib_name = if found
         .file_name()
         .map(|n| n == "libakida.a")
         .unwrap_or(false)
