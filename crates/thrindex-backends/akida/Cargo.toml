@@ -1,0 +1,55 @@
+[package]
+name = "thrindex-backend-akida"
+version = "0.1.0"
+edition = "2024"
+description = "BrainChip AKD1500 backend: validates .thx artifacts and rejects unsupported SNN constructs (RFC-004 / ADR-0011)"
+license = "Apache-2.0"
+
+# --- features -----------------------------------------------------------------
+
+[features]
+# Enable the Engine Library FFI + Tier-2 runtime binary.
+# Requires THRINDEX_AKIDA_ENGINE_PATH to be set at build time.
+hardware = ["dep:cxx"]
+
+# --- binaries -----------------------------------------------------------------
+
+[[bin]]
+name = "akida-runtime"
+path = "runtime/src/main.rs"
+required-features = ["hardware"]
+
+# --- dependencies -------------------------------------------------------------
+
+[dependencies]
+# Justification (§12): Backend trait, Capability, BackendError contract.
+thrindex-backend-api = { path = "../../thrindex-backend-api" }
+# Justification (§12): typed errors with minimal boilerplate.
+thiserror = "2"
+# Justification (§12): JSON parsing of raw .thx artifact string for layer validation;
+# also used by the runtime binary and backend.rs hardware subprocess protocol.
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+# Justification (§12): derive(Serialize, Deserialize) for runtime binary JSON structs.
+serde = { version = "1", features = ["derive"] }
+# Justification (§12): base64 decode of weights_b64 for NaN/inf check (E0403).
+base64 = "0.22"
+# Justification (§12): cxx safe Rust↔C++ interop for Engine Library FFI.
+# Only compiled when `hardware` feature is enabled.
+cxx = { version = "1", optional = true }
+
+# --- dev-dependencies ---------------------------------------------------------
+
+[dev-dependencies]
+# Justification: insta snapshot testing for four-part error message golden tests.
+insta = "1"
+# Justification: capability_round_trip integration test — Capability serialization.
+serde_json = "1"
+# Justification: mock_runtime.rs needs a temporary directory to hold the .fbz.
+tempfile = "3"
+
+# --- build-dependencies -------------------------------------------------------
+
+[build-dependencies]
+# Justification: compiles the cxx bridge shim and generates C++ bindings for ffi.rs.
+# cxx_build is always present; it only runs cmake when THRINDEX_AKIDA_ENGINE_PATH is set.
+cxx-build = "1"

@@ -4,9 +4,11 @@ members = [
     "crates/thrindex-numerics",
     "crates/thrindex-ir",
     "crates/thrindex-backend-api",
+    "crates/thrindex-artifact",
     "crates/thrindex-compiler",
     "crates/thrindex-sim",
     "crates/thrindex-cli",
     "crates/thrindex-py",
     "conformance",
+    "crates/thrindex-backends/akida",
 ]

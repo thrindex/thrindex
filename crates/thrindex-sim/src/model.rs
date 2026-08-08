@@ -30,7 +30,22 @@ pub struct ThxArtifact {
 
 #[derive(Debug, Deserialize)]
 pub struct ThxModel {
-    pub layers: Vec<ThxLayerRaw>,
+    /// Layers stored as raw JSON values to avoid the serde_json
+    /// `arbitrary_precision` + internally-tagged enum incompatibility.
+    ///
+    /// When the `core` binary links both `thrindex-artifact` (which requests
+    /// `serde_json/arbitrary_precision`) and `thrindex-sim`, Cargo feature-unifies
+    /// `serde_json` so that `arbitrary_precision` is active for the whole binary.
+    /// With that feature enabled, `#[serde(tag = "type")]` internally-tagged
+    /// deserialization routes numeric fields through serde's `Content` buffer
+    /// instead of through `serde_json`'s own number path — producing
+    /// `{"$serde_json::private::Number": "…"}` objects where `f32` scalars are
+    /// expected, causing `E0008`.
+    ///
+    /// Storing layers as `Value` (as `thrindex-artifact`'s `WireModel` already
+    /// does) and dispatching manually on the `"type"` string field avoids the
+    /// code path entirely.
+    pub layers: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,18 +59,12 @@ pub struct ThxMetadata {
 }
 
 // ── Raw layer representations (as stored in JSON) ────────────────────────────
-
-/// Raw (still base64-encoded) layer as parsed directly from JSON.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ThxLayerRaw {
-    Dense(DenseRaw),
-    Lif(LifRaw),
-    Conv2d(Conv2dRaw),
-}
+//
+// These structs are intentionally NOT combined into a `#[serde(tag = "type")]`
+// enum — see the `ThxModel::layers` comment above for the reason.
 
 #[derive(Debug, Deserialize)]
-pub struct DenseRaw {
+pub(crate) struct DenseRaw {
     pub in_features: usize,
     pub out_features: usize,
     pub weights_b64: String,
@@ -63,7 +72,7 @@ pub struct DenseRaw {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct LifRaw {
+pub(crate) struct LifRaw {
     pub threshold: f32,
     /// `exp(-dt/tau_mem)` — resolved at compile time (ADR-0007, correction 4).
     pub alpha: f32,
@@ -73,7 +82,7 @@ pub struct LifRaw {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Conv2dRaw {
+pub(crate) struct Conv2dRaw {
     pub in_channels: usize,
     pub out_channels: usize,
     pub kernel_h: usize,
@@ -280,9 +289,24 @@ fn resolve_model(artifact: &ThxArtifact) -> Result<ResolvedModel, SimError> {
     })
 }
 
-fn resolve_layer(raw: &ThxLayerRaw, idx: usize) -> Result<ResolvedLayer, SimError> {
-    match raw {
-        ThxLayerRaw::Dense(d) => {
+/// Dispatch a raw JSON layer value to the appropriate `ResolvedLayer`.
+///
+/// Dispatches on the `"type"` string field and deserialises the value directly
+/// into the concrete typed struct (e.g. `DenseRaw`).  This avoids going through
+/// `#[serde(tag = "type")]` internally-tagged enum deserialization, which is
+/// incompatible with `serde_json`'s `arbitrary_precision` feature (activated by
+/// Cargo feature unification when `thrindex-artifact` is in the same binary).
+fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, SimError> {
+    let layer_type = v["type"].as_str().ok_or_else(|| SimError::JsonParseError {
+        detail: format!("layer[{idx}] missing \"type\" field"),
+    })?;
+
+    match layer_type {
+        "dense" => {
+            let d: DenseRaw =
+                serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
+                    detail: format!("layer[{idx}] dense parse error: {e}"),
+                })?;
             let weights = decode_weights(
                 &d.weights_b64,
                 d.out_features * d.in_features,
@@ -297,7 +321,11 @@ fn resolve_layer(raw: &ThxLayerRaw, idx: usize) -> Result<ResolvedLayer, SimErro
                 bias,
             }))
         }
-        ThxLayerRaw::Lif(l) => {
+        "lif" => {
+            let l: LifRaw =
+                serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
+                    detail: format!("layer[{idx}] lif parse error: {e}"),
+                })?;
             let reset = match l.reset.as_str() {
                 "subtract" => ResetMode::Subtract,
                 "zero" => ResetMode::Zero,
@@ -328,7 +356,11 @@ fn resolve_layer(raw: &ThxLayerRaw, idx: usize) -> Result<ResolvedLayer, SimErro
                 reset,
             }))
         }
-        ThxLayerRaw::Conv2d(c) => {
+        "conv2d" => {
+            let c: Conv2dRaw =
+                serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
+                    detail: format!("layer[{idx}] conv2d parse error: {e}"),
+                })?;
             let n_weights = c.out_channels * c.in_channels * c.kernel_h * c.kernel_w;
             let weights = decode_weights(&c.weights_b64, n_weights, idx, "weights")?;
             let bias = decode_weights_opt(c.bias_b64.as_ref(), c.out_channels, idx, "bias")?;
@@ -343,6 +375,11 @@ fn resolve_layer(raw: &ThxLayerRaw, idx: usize) -> Result<ResolvedLayer, SimErro
                 bias,
             }))
         }
+        other => Err(SimError::JsonParseError {
+            detail: format!(
+                "layer[{idx}] unknown type \"{other}\"; expected \"dense\", \"lif\", or \"conv2d\""
+            ),
+        }),
     }
 }
 

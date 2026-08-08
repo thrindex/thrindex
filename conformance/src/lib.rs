@@ -46,6 +46,7 @@
 //! println!("Certified: {}", report.passed(&CONFORMANCE_ENVELOPE_V0));
 //! ```
 pub mod error;
+pub mod exclusions;
 pub mod harness;
 pub mod metric;
 pub mod report;
