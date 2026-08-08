@@ -42,10 +42,25 @@ use serde::{Deserialize, Serialize};
 
 // Access the cxx bridge from the parent library crate.
 // The `hardware` feature is active when this binary is compiled.
+#[cfg(akida_engine_available)]
 use thrindex_backend_akida::ffi;
 
-// ── JSON protocol types ───────────────────────────────────────────────────────
+// ── Stub entry point (hardware feature on but engine path not set at build time) ─
 
+#[cfg(not(akida_engine_available))]
+fn main() {
+    eprintln!(
+        "akida-runtime: built without Engine Library \
+         (THRINDEX_AKIDA_ENGINE_PATH was not set at compile time). \
+         Rebuild with THRINDEX_AKIDA_ENGINE_PATH pointing to the Engine Library source."
+    );
+    process::exit(1);
+}
+
+// ── Real entry point ──────────────────────────────────────────────────────────
+
+#[cfg(akida_engine_available)]
+// ── JSON protocol types ───────────────────────────────────────────────────────
 #[derive(Deserialize)]
 struct BatchInput {
     /// [N_samples][timesteps][features]
@@ -65,6 +80,7 @@ struct ErrorOutput {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+#[cfg(akida_engine_available)]
 fn main() {
     let result = run_from_args();
     match result {

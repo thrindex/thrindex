@@ -36,15 +36,20 @@ fn main() {
 
     // ── 1.  Locate the Engine Library source drop ─────────────────────────
 
-    let engine_path = env::var("THRINDEX_AKIDA_ENGINE_PATH").unwrap_or_else(|_| {
-        panic!(
-            "\n\nTHRINDEX_AKIDA_ENGINE_PATH is not set.\n\
-             Set it to the root of the Akida Engine Library source drop, e.g.:\n\
-             \n  export THRINDEX_AKIDA_ENGINE_PATH=/path/to/engine/engine\n\
-             \n  cargo build -p thrindex-backend-akida --features hardware\n\n"
-        )
-    });
-    let engine_path = PathBuf::from(&engine_path);
+    let engine_path = match env::var("THRINDEX_AKIDA_ENGINE_PATH") {
+        Ok(p) => {
+            println!("cargo:rustc-cfg=akida_engine_available");
+            PathBuf::from(p)
+        }
+        Err(_) => {
+            println!(
+                "cargo:warning=THRINDEX_AKIDA_ENGINE_PATH is not set — \
+                 skipping Engine Library build. Hardware inference will not be available. \
+                 Set THRINDEX_AKIDA_ENGINE_PATH to build with hardware support."
+            );
+            return;
+        }
+    };
 
     // Validate — must contain CMakeLists.txt
     if !engine_path.join("CMakeLists.txt").exists() {

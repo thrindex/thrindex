@@ -40,8 +40,9 @@ pub mod capability;
 pub mod error;
 pub mod validate;
 
-/// Engine Library FFI bridge (compiled only with `--features hardware`).
-#[cfg(feature = "hardware")]
+/// Engine Library FFI bridge (compiled only when `hardware` feature is enabled
+/// AND `THRINDEX_AKIDA_ENGINE_PATH` was set at build time).
+#[cfg(all(feature = "hardware", akida_engine_available))]
 pub mod ffi;
 
 pub use backend::AkidaBackend;
