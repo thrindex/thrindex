@@ -23,7 +23,7 @@
 // therefore only verifies that the enqueue path does not crash; it does NOT
 // call the fetch-poll loop.  A real-chip test (item 10) proves end-to-end output.
 
-#[cfg(all(feature = "hardware"))]
+#[cfg(all(feature = "hardware", akida_engine_available))]
 mod hardware_tests {
     use std::path::PathBuf;
     use std::process::Command;
