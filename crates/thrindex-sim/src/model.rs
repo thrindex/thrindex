@@ -30,7 +30,7 @@ pub struct ThxArtifact {
 
 #[derive(Debug, Deserialize)]
 pub struct ThxModel {
-    /// Layers stored as raw JSON values to avoid the serde_json
+    /// Layers stored as raw JSON values to avoid the `serde_json`
     /// `arbitrary_precision` + internally-tagged enum incompatibility.
     ///
     /// When the `core` binary links both `thrindex-artifact` (which requests
