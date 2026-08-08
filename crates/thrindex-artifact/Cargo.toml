@@ -8,13 +8,12 @@ license = "Apache-2.0"
 [dependencies]
 # Justification (§12): JSON serialization/deserialization of .thx format (ADR-0006).
 serde = { version = "1", features = ["derive"] }
-# arbitrary_precision: preserves the exact decimal string of every number so
-# that re-serialisation is byte-identical even for fixtures written with
-# pre-ryu serde_json versions ("0.9048374180359595" stays intact).
 # preserve_order: stores object keys in insertion order (IndexMap) so that
-# hand-written fixtures with non-BTreeMap key ordering survive the round-trip
-# byte-identically (e.g. "type" before "in_features").
-serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+# hand-written fixtures with non-BTreeMap key ordering survive the round-trip.
+# Note: arbitrary_precision is intentionally omitted — enabling it poisons the
+# whole workspace's serde_json (feature unification) and breaks the compiler's
+# IR JSON parsing which expects plain f64 values.
+serde_json = { version = "1", features = ["preserve_order"] }
 # Justification (§12): typed errors with minimal boilerplate.
 thiserror = "2"
 # Justification (§12): CRC32 integrity verification matching thrindex-sim/thrindex-compiler.
