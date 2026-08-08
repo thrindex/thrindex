@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "thrindex"
-version = "0.3.4"  # single source of truth; __init__.py reads this via importlib.metadata
+version = "0.4.0"  # single source of truth; __init__.py reads this via importlib.metadata
 description = "The open compiler for spiking neuromorphic compute."
 readme = "README.md"
 license = "Apache-2.0"
