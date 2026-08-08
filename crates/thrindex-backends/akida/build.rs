@@ -91,7 +91,6 @@ fn main() {
     // Older builds may produce libakida_engine.a; we check both.
     let lib_file_primary = "libakida.a";
     let lib_file_secondary = "libakida_engine.a";
-    let lib_name;
 
     let candidates: Vec<_> = ["", "lib", "src", "akida_engine", "akida"]
         .iter()
