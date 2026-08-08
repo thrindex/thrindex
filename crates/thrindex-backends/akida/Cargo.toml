@@ -28,7 +28,7 @@ thrindex-backend-api = { path = "../../thrindex-backend-api" }
 thiserror = "2"
 # Justification (§12): JSON parsing of raw .thx artifact string for layer validation;
 # also used by the runtime binary and backend.rs hardware subprocess protocol.
-serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+serde_json = "1"
 # Justification (§12): derive(Serialize, Deserialize) for runtime binary JSON structs.
 serde = { version = "1", features = ["derive"] }
 # Justification (§12): base64 decode of weights_b64 for NaN/inf check (E0403).
