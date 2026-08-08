@@ -18,6 +18,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
+    // Declare `akida_engine_available` as a known cfg so rustc doesn't warn
+    // about it being unexpected in #[cfg(akida_engine_available)] attributes.
+    println!("cargo::rustc-check-cfg=cfg(akida_engine_available)");
+
     // Always re-run when these change, regardless of feature flag.
     println!("cargo:rerun-if-env-changed=THRINDEX_AKIDA_ENGINE_PATH");
     println!("cargo:rerun-if-changed=build.rs");

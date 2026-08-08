@@ -77,18 +77,18 @@ impl Backend for AkidaBackend {
         validate_artifact(artifact_json)?;
 
         // Step 2: E0407 — reject T > 1 temporal sequences.
-        if let Some(sample) = inputs.first() {
-            if sample.len() != 1 {
-                let batch = inputs.len();
-                let timesteps = sample.len();
-                let features = sample.first().map(Vec::len).unwrap_or(0);
-                return Err(AkidaError::TemporalInputNotSupported {
-                    batch,
-                    timesteps,
-                    features,
-                }
-                .into());
+        if let Some(sample) = inputs.first()
+            && sample.len() != 1
+        {
+            let batch = inputs.len();
+            let timesteps = sample.len();
+            let features = sample.first().map(Vec::len).unwrap_or(0);
+            return Err(AkidaError::TemporalInputNotSupported {
+                batch,
+                timesteps,
+                features,
             }
+            .into());
         }
 
         // Step 3: delegate to hardware or stub.

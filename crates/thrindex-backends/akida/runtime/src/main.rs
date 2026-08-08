@@ -34,18 +34,9 @@
 //     step 2:  u8 = v4 * 17                                   [maps 15→255]
 //   This matches InputData(input_bits=4) in akida_compile.py.
 
-use std::io::{self, Read};
-use std::path::{Path, PathBuf};
 use std::process;
 
-use serde::{Deserialize, Serialize};
-
-// Access the cxx bridge from the parent library crate.
-// The `hardware` feature is active when this binary is compiled.
-#[cfg(akida_engine_available)]
-use thrindex_backend_akida::ffi;
-
-// ── Stub entry point (hardware feature on but engine path not set at build time) ─
+// ── Stub entry point (hardware feature on but THRINDEX_AKIDA_ENGINE_PATH not set) ──
 
 #[cfg(not(akida_engine_available))]
 fn main() {
@@ -57,22 +48,34 @@ fn main() {
     process::exit(1);
 }
 
-// ── Real entry point ──────────────────────────────────────────────────────────
+// ── Full implementation (Engine Library present at build time) ─────────────────
 
 #[cfg(akida_engine_available)]
+use std::io::{self, Read};
+
+#[cfg(akida_engine_available)]
+use serde::{Deserialize, Serialize};
+
+#[cfg(akida_engine_available)]
+use thrindex_backend_akida::ffi;
+
 // ── JSON protocol types ───────────────────────────────────────────────────────
+
+#[cfg(akida_engine_available)]
 #[derive(Deserialize)]
 struct BatchInput {
     /// [N_samples][timesteps][features]
     batch: Vec<Vec<Vec<f32>>>,
 }
 
+#[cfg(akida_engine_available)]
 #[derive(Serialize)]
 struct BatchOutput {
     /// [N_samples][out_features]
     outputs: Vec<Vec<f32>>,
 }
 
+#[cfg(akida_engine_available)]
 #[derive(Serialize)]
 struct ErrorOutput {
     error: String,
@@ -97,8 +100,8 @@ fn main() {
     }
 }
 
+#[cfg(akida_engine_available)]
 fn run_from_args() -> Result<BatchOutput, String> {
-    // ── Parse CLI ────────────────────────────────────────────────────────────
     let args: Vec<String> = std::env::args().collect();
     let mut fbz_path: Option<String> = None;
     let mut pcie_addr = String::from("0001:01:00.0");
@@ -123,7 +126,6 @@ fn run_from_args() -> Result<BatchOutput, String> {
     let fbz_path = fbz_path
         .ok_or_else(|| "E0204: usage: akida-runtime <fbz_path> [--pcie-addr ADDR]".to_owned())?;
 
-    // ── Read stdin ───────────────────────────────────────────────────────────
     let mut stdin_buf = String::new();
     io::stdin()
         .read_to_string(&mut stdin_buf)
@@ -134,12 +136,11 @@ fn run_from_args() -> Result<BatchOutput, String> {
 
 // ── Core inference logic ──────────────────────────────────────────────────────
 
+#[cfg(akida_engine_available)]
 fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput, String> {
-    // ── Parse input JSON ─────────────────────────────────────────────────────
     let input: BatchInput =
         serde_json::from_str(stdin_json).map_err(|e| format!("E0204: invalid stdin JSON: {e}"))?;
 
-    // ── Validate T=1 per sample (E0407) ──────────────────────────────────────
     for (idx, sample) in input.batch.iter().enumerate() {
         if sample.len() != 1 {
             return Err(format!(
@@ -159,10 +160,6 @@ fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput,
     let n_samples = input.batch.len();
     let n_features = input.batch[0][0].len();
 
-    // ── Quantize f32 → u8 ────────────────────────────────────────────────────
-    // InputData(input_bits=4): 4-bit values (0..15) stored in a u8 container.
-    // Mapping: f32 × 15 → round → clamp(0,15) → × 17 → u8
-    // So f32=0.0 → 0 and f32=1.0 → 255.
     let mut input_u8: Vec<u8> = Vec::with_capacity(n_samples * n_features);
     for sample in &input.batch {
         for &v in &sample[0] {
@@ -170,29 +167,18 @@ fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput,
         }
     }
 
-    // ── Read .fbz ────────────────────────────────────────────────────────────
     let fbz = std::fs::read(fbz_path)
         .map_err(|e| format!("E0204: cannot read .fbz at {fbz_path}: {e}"))?;
     if fbz.is_empty() {
         return Err(format!("E0204: .fbz at {fbz_path} is empty"));
     }
 
-    // ── Hardware inference ────────────────────────────────────────────────────
-    // Exactly follows the test.cpp reference implementation (user spec §CONFIRMED):
-    //   HardwareDevice::create(&driver)
-    //   device.program(fbz_bytes)
-    //   akida_run_batch: set_batch_size → enqueue loop → fetch loop → dequantize
-
-    // Step 4 (user plan): create PCIe device
     let mut device = ffi::create_pcie_device(pcie_addr)
         .map_err(|e| format!("E0204: device init failed for PCIe addr {pcie_addr}: {e}"))?;
 
-    // Step 6 (user plan): program the device
     ffi::device_program(device.pin_mut(), &fbz)
         .map_err(|e| format!("E0204: device program failed: {e}"))?;
 
-    // Steps 7-12 (user plan): set_batch_size + enqueue loop + fetch + dequantize
-    // All handled by akida_run_batch in bridge.cpp.
     let output_floats = ffi::akida_run_batch(
         device.pin_mut(),
         &input_u8,
@@ -201,7 +187,6 @@ fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput,
     )
     .map_err(|e| format!("E0204: inference failed: {e}"))?;
 
-    // ── Reshape [N * out_features] → [N][out_features] ───────────────────────
     if output_floats.is_empty() {
         return Err("E0204: akida_run_batch returned empty output".to_owned());
     }
@@ -215,7 +200,7 @@ fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput,
 
     let outputs: Vec<Vec<f32>> = output_floats
         .chunks(out_features)
-        .map(|c| c.to_vec())
+        .map(|c: &[f32]| c.to_vec())
         .collect();
 
     Ok(BatchOutput { outputs })
@@ -229,13 +214,14 @@ fn run(fbz_path: &str, pcie_addr: &str, stdin_json: &str) -> Result<BatchOutput,
 /// The Engine Library expects them as u8 values where 4-bit n maps to u8 n×17:
 ///   0 → 0,  1 → 17,  7 → 119,  8 → 136,  15 → 255
 /// This is the standard AKD1500 encoding for 4-bit inputs.
+#[cfg(any(akida_engine_available, test))]
 #[inline]
 fn quantize_f32_to_u8(v: f32) -> u8 {
     let v4 = (v * 15.0).round().clamp(0.0, 15.0) as u8;
     v4.saturating_mul(17)
 }
 
-// ── Unit tests (compile-only, no hardware) ───────────────────────────────────
+// ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -245,14 +231,12 @@ mod tests {
     fn quantize_boundaries() {
         assert_eq!(quantize_f32_to_u8(0.0), 0);
         assert_eq!(quantize_f32_to_u8(1.0), 255);
-        // f32=0.5 → round(7.5) = 8 → 8*17 = 136
         assert_eq!(quantize_f32_to_u8(0.5), 136);
-        // negative → clamped to 0
         assert_eq!(quantize_f32_to_u8(-1.0), 0);
-        // > 1.0 → clamped to 255
         assert_eq!(quantize_f32_to_u8(2.0), 255);
     }
 
+    #[cfg(akida_engine_available)]
     #[test]
     fn t_not_1_rejected() {
         let json = r#"{"batch": [[[0.1, 0.2], [0.3, 0.4]]]}"#; // T=2
@@ -261,12 +245,11 @@ mod tests {
         assert!(err.starts_with("E0407"), "expected E0407, got: {err}");
     }
 
+    #[cfg(akida_engine_available)]
     #[test]
     fn empty_batch_returns_empty() {
         let json = r#"{"batch": []}"#;
-        let result = run("dummy.fbz", "0001:01:00.0", json);
-        // An empty batch short-circuits before touching hardware
-        let output = result.unwrap();
+        let output = run("dummy.fbz", "0001:01:00.0", json).unwrap();
         assert!(output.outputs.is_empty());
     }
 }
