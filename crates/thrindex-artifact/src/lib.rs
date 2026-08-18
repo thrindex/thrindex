@@ -49,7 +49,7 @@ mod wire;
 
 pub use artifact::{Artifact, SUPPORTED_VERSIONS};
 pub use error::ArtifactError;
-pub use layers::{Conv2dLayer, DenseLayer, Layer, LifLayer};
+pub use layers::{Conv2dLayer, DenseLayer, FlattenLayer, Layer, LifLayer};
 pub use resource::ResourceSummary;
 
 /// Parse a `.thx` artifact from a UTF-8 string.

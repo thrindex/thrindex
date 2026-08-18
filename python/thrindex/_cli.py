@@ -89,7 +89,7 @@ def _load_input_file(path: str) -> list[list[list[float]]]:
 
 
 def _validate_input_shape(
-    input_spikes: list[list[list[float]]],
+    input_spikes: object,
     expected_features: int,
     source: str,
 ) -> None:
@@ -98,7 +98,7 @@ def _validate_input_shape(
     Parameters
     ----------
     input_spikes:
-        3-D list [batch, T, n_features].
+        Untrusted JSON value; must be a 3-D list [batch, T, n_features].
     expected_features:
         Number of input features declared in the artifact.
     source:
@@ -109,11 +109,10 @@ def _validate_input_shape(
     SystemExit
         On any shape mismatch, prints an E0010 message to stderr and exits.
     """
-    n_samples = len(input_spikes)
-    if n_samples == 0:
+    if not isinstance(input_spikes, list) or len(input_spikes) == 0:
         _die(f"E0010: input {source!r} is empty (zero samples).")
 
-    first_t = None
+    first_t: int | None = None
     for i, sample in enumerate(input_spikes):
         if not isinstance(sample, list) or len(sample) == 0:
             _die(

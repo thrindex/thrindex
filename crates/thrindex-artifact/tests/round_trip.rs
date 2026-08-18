@@ -196,6 +196,10 @@ fn keyword_spotting_semantic_round_trip() {
                 assert_eq!(c1.out_channels, c2.out_channels, "layer {i} out_channels");
                 assert_eq!(c1.weights_b64, c2.weights_b64, "layer {i} weights_b64");
             }
+            (Layer::Flatten(f1), Layer::Flatten(f2)) => {
+                assert_eq!(f1.start_dim, f2.start_dim, "layer {i} start_dim");
+                assert_eq!(f1.end_dim, f2.end_dim, "layer {i} end_dim");
+            }
             _ => panic!("layer {i} type mismatch between original and re-parsed"),
         }
     }

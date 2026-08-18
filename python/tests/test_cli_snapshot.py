@@ -163,7 +163,7 @@ class TestInputFlag:
         except ImportError:
             pytest.skip("thrindex._core not built")
 
-        from thrindex._cli import _cmd_run
+        from thrindex._cli import _cmd_run  # type: ignore[reportPrivateUsage]
 
         artifact = cli_snap_setup["artifact"]
 
@@ -193,7 +193,7 @@ class TestInputFlag:
         except ImportError:
             pytest.skip("thrindex._core not built")
 
-        from thrindex._cli import _cmd_run
+        from thrindex._cli import _cmd_run  # type: ignore[reportPrivateUsage]
 
         artifact = cli_snap_setup["artifact"]
 
@@ -223,7 +223,7 @@ class TestInputValidation:
     """Verify that _load_input_file and _validate_input_shape reject bad input clearly."""
 
     def test_load_valid_file(self, tmp_path: Path) -> None:
-        from thrindex._cli import _load_input_file
+        from thrindex._cli import _load_input_file  # type: ignore[reportPrivateUsage]
 
         data = [[[0.0, 1.0], [1.0, 0.0]]]  # [batch=1, T=2, features=2]
         f = tmp_path / "valid.json"
@@ -232,13 +232,13 @@ class TestInputValidation:
         assert result == data
 
     def test_load_missing_file_exits(self, tmp_path: Path) -> None:
-        from thrindex._cli import _load_input_file
+        from thrindex._cli import _load_input_file  # type: ignore[reportPrivateUsage]
 
         with pytest.raises(SystemExit):
             _load_input_file(str(tmp_path / "nonexistent.json"))
 
     def test_load_invalid_json_exits(self, tmp_path: Path) -> None:
-        from thrindex._cli import _load_input_file
+        from thrindex._cli import _load_input_file  # type: ignore[reportPrivateUsage]
 
         f = tmp_path / "bad.json"
         f.write_text("not json", encoding="utf-8")
@@ -246,7 +246,7 @@ class TestInputValidation:
             _load_input_file(str(f))
 
     def test_load_empty_array_exits(self, tmp_path: Path) -> None:
-        from thrindex._cli import _load_input_file
+        from thrindex._cli import _load_input_file  # type: ignore[reportPrivateUsage]
 
         f = tmp_path / "empty.json"
         f.write_text("[]", encoding="utf-8")
@@ -254,14 +254,14 @@ class TestInputValidation:
             _load_input_file(str(f))
 
     def test_validate_wrong_features_exits(self) -> None:
-        from thrindex._cli import _validate_input_shape
+        from thrindex._cli import _validate_input_shape  # type: ignore[reportPrivateUsage]
 
         spikes = [[[0.0, 1.0]]]  # n_features=2
         with pytest.raises(SystemExit):
             _validate_input_shape(spikes, expected_features=8, source="test")
 
     def test_validate_inconsistent_T_exits(self) -> None:
-        from thrindex._cli import _validate_input_shape
+        from thrindex._cli import _validate_input_shape  # type: ignore[reportPrivateUsage]
 
         # sample[0] has T=2, sample[1] has T=3
         spikes = [
@@ -272,7 +272,7 @@ class TestInputValidation:
             _validate_input_shape(spikes, expected_features=2, source="test")
 
     def test_validate_valid_shape_passes(self) -> None:
-        from thrindex._cli import _validate_input_shape
+        from thrindex._cli import _validate_input_shape  # type: ignore[reportPrivateUsage]
 
         spikes = [[[0.0, 1.0, 0.0], [1.0, 0.0, 1.0]]]  # [batch=1, T=2, features=3]
         # Must not raise.

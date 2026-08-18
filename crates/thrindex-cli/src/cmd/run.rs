@@ -60,7 +60,7 @@ fn first_in_features(model: &thrindex_sim::model::ResolvedModel) -> usize {
         .find_map(|l| match l {
             ResolvedLayer::Dense(d) => Some(d.in_features),
             ResolvedLayer::Conv2d(c) => Some(c.in_channels),
-            ResolvedLayer::Lif(_) => None,
+            ResolvedLayer::Lif(_) | ResolvedLayer::Flatten(_) => None,
         })
         .unwrap_or(1)
 }

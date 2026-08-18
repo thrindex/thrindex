@@ -25,6 +25,7 @@ pub enum Layer {
     Dense(DenseLayer),
     Lif(LifLayer),
     Conv2d(Conv2dLayer),
+    Flatten(FlattenLayer),
 }
 
 /// Fully-connected layer.
@@ -75,6 +76,15 @@ pub struct Conv2dLayer {
     pub bias_b64: Option<String>,
 }
 
+/// Spatial-to-feature flatten (no learned parameters).
+#[derive(Debug, Clone, Deserialize)]
+pub struct FlattenLayer {
+    /// First dimension to flatten (torch convention; default 1).
+    pub start_dim: i32,
+    /// Last dimension to flatten inclusive (torch convention; default -1).
+    pub end_dim: i32,
+}
+
 // ── Internal wire helper (only for deserialisation) ───────────────────────────
 
 /// Internal discriminated union used to route deserialization.
@@ -87,6 +97,7 @@ enum LayerWire {
     Dense(DenseLayer),
     Lif(LifLayer),
     Conv2d(Conv2dLayer),
+    Flatten(FlattenLayer),
 }
 
 /// Convert a raw JSON `Value` (as stored in `WireModel.layers`) to a typed [`Layer`].
@@ -103,5 +114,6 @@ pub fn parse_layer(v: &serde_json::Value) -> Result<Layer, ArtifactError> {
         LayerWire::Dense(d) => Layer::Dense(d),
         LayerWire::Lif(l) => Layer::Lif(l),
         LayerWire::Conv2d(c) => Layer::Conv2d(c),
+        LayerWire::Flatten(f) => Layer::Flatten(f),
     })
 }
