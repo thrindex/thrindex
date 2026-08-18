@@ -27,4 +27,6 @@
 
 pub mod graph;
 
-pub use graph::{Delays, GraphConv2d, GraphDense, GraphFlatten, GraphLayer, GraphLif, GraphModel, ResetMode};
+pub use graph::{
+    Delays, GraphConv2d, GraphDense, GraphFlatten, GraphLayer, GraphLif, GraphModel, ResetMode,
+};

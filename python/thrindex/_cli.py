@@ -187,7 +187,12 @@ def _cmd_run(argv: list[str]) -> None:
             "When omitted, a deterministic demo input is generated."
         ),
     )
-    parser.add_argument("--seed", type=int, default=0, help="Encoder seed (demo mode) or transcript seed.")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Encoder seed (demo mode) or transcript seed.",
+    )
     parser.add_argument(
         "--threads",
         type=int,

@@ -22,6 +22,8 @@ All tests skip gracefully when ``thrindex._core`` has not been built (run
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
 import pytest
 import thrindex.snn as snn
 import torch
@@ -153,7 +155,7 @@ class TestInputFlag:
     def test_input_file_produces_transcript(
         self,
         cli_snap_setup: dict,  # type: ignore[type-arg]
-        tmp_path,  # type: ignore[type-arg]
+        tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         try:
@@ -182,7 +184,7 @@ class TestInputFlag:
     def test_input_file_different_from_demo(
         self,
         cli_snap_setup: dict,  # type: ignore[type-arg]
-        tmp_path,  # type: ignore[type-arg]
+        tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Transcript from real input differs from the demo-mode transcript."""
@@ -220,7 +222,7 @@ class TestInputFlag:
 class TestInputValidation:
     """Verify that _load_input_file and _validate_input_shape reject bad input clearly."""
 
-    def test_load_valid_file(self, tmp_path) -> None:  # type: ignore[type-arg]
+    def test_load_valid_file(self, tmp_path: Path) -> None:
         from thrindex._cli import _load_input_file
 
         data = [[[0.0, 1.0], [1.0, 0.0]]]  # [batch=1, T=2, features=2]
@@ -229,13 +231,13 @@ class TestInputValidation:
         result = _load_input_file(str(f))
         assert result == data
 
-    def test_load_missing_file_exits(self, tmp_path) -> None:  # type: ignore[type-arg]
+    def test_load_missing_file_exits(self, tmp_path: Path) -> None:
         from thrindex._cli import _load_input_file
 
         with pytest.raises(SystemExit):
             _load_input_file(str(tmp_path / "nonexistent.json"))
 
-    def test_load_invalid_json_exits(self, tmp_path) -> None:  # type: ignore[type-arg]
+    def test_load_invalid_json_exits(self, tmp_path: Path) -> None:
         from thrindex._cli import _load_input_file
 
         f = tmp_path / "bad.json"
@@ -243,7 +245,7 @@ class TestInputValidation:
         with pytest.raises(SystemExit):
             _load_input_file(str(f))
 
-    def test_load_empty_array_exits(self, tmp_path) -> None:  # type: ignore[type-arg]
+    def test_load_empty_array_exits(self, tmp_path: Path) -> None:
         from thrindex._cli import _load_input_file
 
         f = tmp_path / "empty.json"
