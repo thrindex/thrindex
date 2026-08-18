@@ -8,7 +8,7 @@ from __future__ import annotations
 import torch.nn.functional as F
 from torch import Tensor
 
-__all__ = ["rate_loss"]
+__all__ = ["accuracy", "rate_loss"]
 
 
 def rate_loss(spikes: Tensor, labels: Tensor) -> Tensor:
@@ -40,3 +40,36 @@ def rate_loss(spikes: Tensor, labels: Tensor) -> Tensor:
     # Mean firing rate over T timesteps: [batch, n_classes]
     mean_rates = spikes.mean(dim=0)
     return F.cross_entropy(mean_rates, labels)
+
+
+def accuracy(spikes: Tensor, labels: Tensor) -> float:
+    """Classification accuracy: fraction of correct predictions.
+
+    The predicted class for each sample is the output neuron with the highest
+    total spike count over ``T`` timesteps (rate decoding, argmax).
+
+    Parameters
+    ----------
+    spikes:
+        Output spike tensor, shape ``[T, batch, n_classes]``.
+    labels:
+        Ground-truth class indices, shape ``[batch]``.
+
+    Returns
+    -------
+    float
+        Accuracy in ``[0.0, 1.0]``.  Not differentiable — use :func:`rate_loss`
+        for the training objective.
+
+    Example
+    -------
+    ::
+
+        spikes = model(encoded_input)                    # [T, batch, n_classes]
+        loss = rate_loss(spikes, labels)
+        acc = accuracy(spikes, labels)                   # e.g. 0.924
+        print(f"loss={loss.item():.4f}  acc={acc:.3f}")
+    """
+    mean_rates = spikes.mean(dim=0)           # [batch, n_classes]
+    predictions = mean_rates.argmax(dim=1)    # [batch]
+    return (predictions == labels).float().mean().item()

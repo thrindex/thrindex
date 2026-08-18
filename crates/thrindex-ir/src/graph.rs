@@ -59,6 +59,14 @@ pub enum GraphLayer {
     /// Reopening trigger: a design partner ships a Conv2d-delay model where the
     /// absence of delay support is a proven constraint.
     Conv2d(GraphConv2d),
+
+    /// Flatten layer: reshape spatial output to a 1-D feature vector.
+    ///
+    /// No learned parameters.  `start_dim` and `end_dim` follow the convention of
+    /// `torch.nn.Flatten` (1-indexed; -1 = last dimension).  The most common usage
+    /// is `start_dim=1, end_dim=-1` (flatten all non-batch dims), which is the
+    /// default produced by `thrindex.snn.Flatten()`.
+    Flatten(GraphFlatten),
 }
 
 // ── Layer types ───────────────────────────────────────────────────────────────
@@ -153,6 +161,19 @@ pub struct GraphConv2d {
 
     /// Optional bias as base64 little-endian `f32` (length `out_channels`).
     pub bias_b64: Option<String>,
+}
+
+/// Flatten layer in the Graph IR.
+///
+/// No learned parameters.  Carries `start_dim` / `end_dim` for fidelity with
+/// `torch.nn.Flatten`; the simulator treats this as a no-op until full spatial
+/// shape tracking is implemented (M3 deferred).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphFlatten {
+    /// First dimension to flatten (1 = first non-batch dim, matching torch default).
+    pub start_dim: i32,
+    /// Last dimension to flatten inclusive (-1 = last dim, matching torch default).
+    pub end_dim: i32,
 }
 
 // ── Delays ────────────────────────────────────────────────────────────────────

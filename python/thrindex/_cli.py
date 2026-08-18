@@ -12,6 +12,7 @@ targets  List available simulation targets.
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import NoReturn
 
@@ -26,8 +27,6 @@ def _parse_first_in_features(artifact_path: str) -> int:
 
     Pure Python — no Rust, no torch — so this works even without a full build.
     """
-    import json
-
     try:
         data = json.loads(open(artifact_path, encoding="utf-8").read())
     except (OSError, json.JSONDecodeError) as exc:
@@ -39,6 +38,109 @@ def _parse_first_in_features(artifact_path: str) -> int:
         if t == "conv2d":
             return int(layer["in_channels"])
     return 64  # fallback
+
+
+def _load_input_file(path: str) -> list[list[list[float]]]:
+    """Load spike input from a JSON file or stdin (path == "-").
+
+    Expected format: a 3-D JSON array of shape [batch, T, n_features] where
+    every value is 0.0 or 1.0.
+
+    Parameters
+    ----------
+    path:
+        Path to a JSON file, or ``"-"`` to read from stdin.
+
+    Returns
+    -------
+    list[list[list[float]]]
+        Spike raster with shape [batch, T, n_features].
+
+    Raises
+    ------
+    SystemExit
+        On any I/O or parse error, prints an E-code message to stderr and exits.
+    """
+    try:
+        if path == "-":
+            raw = sys.stdin.read()
+            source = "<stdin>"
+        else:
+            raw = open(path, encoding="utf-8").read()
+            source = repr(path)
+    except OSError as exc:
+        _die(f"E0001: cannot open input file {path!r}: {exc}")
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        _die(
+            f"E0008: input file {source} is not valid JSON: {exc}\n"
+            "Expected a 3-D array [[[ float, ... ], ...], ...] of shape [batch, T, n_features]."
+        )
+
+    if not isinstance(data, list) or len(data) == 0:
+        _die(
+            f"E0010: input {source} must be a non-empty JSON array.\n"
+            "Expected shape [batch, T, n_features]."
+        )
+
+    return data  # type: ignore[return-value]
+
+
+def _validate_input_shape(
+    input_spikes: list[list[list[float]]],
+    expected_features: int,
+    source: str,
+) -> None:
+    """Validate the shape of a spike raster before passing it to run_sim.
+
+    Parameters
+    ----------
+    input_spikes:
+        3-D list [batch, T, n_features].
+    expected_features:
+        Number of input features declared in the artifact.
+    source:
+        Human-readable label for error messages (file path or "<stdin>").
+
+    Raises
+    ------
+    SystemExit
+        On any shape mismatch, prints an E0010 message to stderr and exits.
+    """
+    n_samples = len(input_spikes)
+    if n_samples == 0:
+        _die(f"E0010: input {source!r} is empty (zero samples).")
+
+    first_t = None
+    for i, sample in enumerate(input_spikes):
+        if not isinstance(sample, list) or len(sample) == 0:
+            _die(
+                f"E0010: input {source!r} sample[{i}] must be a non-empty list of timesteps.\n"
+                "Expected shape [batch, T, n_features]."
+            )
+        t = len(sample)
+        if first_t is None:
+            first_t = t
+        elif t != first_t:
+            _die(
+                f"E0010: input {source!r} samples have inconsistent T: "
+                f"sample[0] has T={first_t}, sample[{i}] has T={t}.\n"
+                "All samples must have the same number of timesteps."
+            )
+        for j, frame in enumerate(sample):
+            if not isinstance(frame, list):
+                _die(
+                    f"E0010: input {source!r} sample[{i}][{j}] must be a list of floats."
+                )
+            if len(frame) != expected_features:
+                _die(
+                    f"E0010: input {source!r} sample[{i}][{j}] has {len(frame)} features, "
+                    f"but artifact expects {expected_features}.\n"
+                    "Ensure the input was encoded from data with the same feature dimension "
+                    "as the model's first layer."
+                )
 
 
 def _gen_demo_input(n_features: int, t_steps: int, seed: int) -> list[list[list[float]]]:
@@ -75,7 +177,17 @@ def _cmd_run(argv: list[str]) -> None:
         description="Run a .thx artifact through the behavioral simulator.",
     )
     parser.add_argument("artifact", help="Path to the .thx artifact.")
-    parser.add_argument("--seed", type=int, default=0, help="Encoder seed.")
+    parser.add_argument(
+        "--input",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Path to a JSON spike input file, or '-' for stdin. "
+            "Format: 3-D array [batch, T, n_features] with values 0.0 or 1.0. "
+            "When omitted, a deterministic demo input is generated."
+        ),
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Encoder seed (demo mode) or transcript seed.")
     parser.add_argument(
         "--threads",
         type=int,
@@ -90,9 +202,16 @@ def _cmd_run(argv: list[str]) -> None:
     except ImportError:
         _die("E0001: thrindex._core not found — wheel may be incomplete. Run `thrindex doctor`.")
 
-    # Generate a deterministic demo input (encoder logic — see _gen_demo_input).
     n_features = _parse_first_in_features(args.artifact)
-    input_spikes = _gen_demo_input(n_features, 100, args.seed)
+
+    if args.input is not None:
+        # User-supplied spike input.
+        source = "<stdin>" if args.input == "-" else args.input
+        input_spikes = _load_input_file(args.input)
+        _validate_input_shape(input_spikes, n_features, source)
+    else:
+        # Demo path: deterministic LCG input for smoke / quickstart.
+        input_spikes = _gen_demo_input(n_features, 100, args.seed)
 
     _spikes, _stats, transcript = run_sim(
         args.artifact,
@@ -219,11 +338,14 @@ def _cmd_targets(argv: list[str]) -> None:
     print(border)
     print(f" thrindex {_sdk_version()}  —  available targets")
     print(border)
-    print(" sim      Behavioral simulator")
-    print("          Precision: float32  |  ADR-0007")
-    print("          Deterministic, CPU-parallel (Rayon)")
+    print(" sim               Behavioral simulator")
+    print("                   Precision: float32  |  ADR-0007")
+    print("                   Deterministic, CPU-parallel (Rayon)")
     print("─" * 55)
-    print(" Fixed-point targets: pending RFC-004 (target calibration)")
+    print(" akida-akd1500     BrainChip AKD1500 neuromorphic chip")
+    print("                   Precision: int4  |  RFC-004 / ADR-0011")
+    print("                   Requires: --features hardware + Engine Library")
+    print("                   Note: LIF layers rejected (non-SNN backend)")
     print(border)
 
 
@@ -270,9 +392,10 @@ def _print_help() -> None:
         "Usage: thrindex <subcommand> [options]\n"
         "\n"
         "Subcommands:\n"
-        "  run <model.thx>   Run the behavioral simulator\n"
-        "  doctor            Diagnose the installation\n"
-        "  targets           List available simulation targets\n"
+        "  run <model.thx>            Run the behavioral simulator\n"
+        "  run <model.thx> --input FILE   Run with spike input from a JSON file\n"
+        "  doctor                     Diagnose the installation\n"
+        "  targets                    List available simulation targets\n"
         "\n"
         "Run `thrindex <subcommand> --help` for subcommand options."
     )

@@ -148,6 +148,10 @@ fn run_one_sample(model: &ResolvedModel, input: &[Vec<f32>]) -> SampleResult {
                     // Conv2d execution deferred to M3 (reshape semantics for spike frames).
                     // A proper implementation requires shape tracking across timesteps.
                 }
+                ResolvedLayer::Flatten(_) => {
+                    // Flatten is a no-op in the current 1-D simulation model.
+                    // Full spatial shape propagation is deferred alongside Conv2d (M3).
+                }
                 ResolvedLayer::Lif(lif) => {
                     if lif_states[i].is_none() {
                         lif_states[i] = Some(LifState::zeros(h.len(), lif.alpha_syn.is_some()));
@@ -212,7 +216,7 @@ fn first_input_dim(model: &ResolvedModel) -> Option<usize> {
         match layer {
             ResolvedLayer::Dense(d) => return Some(d.in_features),
             ResolvedLayer::Conv2d(c) => return Some(c.in_channels),
-            ResolvedLayer::Lif(_) => {}
+            ResolvedLayer::Lif(_) | ResolvedLayer::Flatten(_) => {}
         }
     }
     None
@@ -305,6 +309,7 @@ fn model_summary(model: &ResolvedModel) -> String {
                     c.in_channels, c.out_channels, c.kernel_h, c.kernel_w
                 )
             }
+            ResolvedLayer::Flatten(_) => "Flatten".to_string(),
         })
         .collect::<Vec<_>>()
         .join(" → ")

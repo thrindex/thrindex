@@ -139,6 +139,7 @@ pub fn lower(model: &GraphModel, target: &str) -> Result<CompileReport, CompileE
             }
             GraphLayer::Lif(lif) => lower_lif(lif, idx, target_dt)?,
             GraphLayer::Conv2d(conv) => lower_conv2d(conv),
+            GraphLayer::Flatten(flatten) => lower_flatten(flatten),
         };
         thx_layers.push(v);
     }
@@ -262,6 +263,14 @@ fn lower_conv2d(conv: &thrindex_ir::GraphConv2d) -> Value {
         "padding": conv.padding,
         "weights_b64": conv.weights_b64,
         "bias_b64": conv.bias_b64,
+    })
+}
+
+fn lower_flatten(flatten: &thrindex_ir::GraphFlatten) -> Value {
+    serde_json::json!({
+        "type": "flatten",
+        "start_dim": flatten.start_dim,
+        "end_dim": flatten.end_dim,
     })
 }
 

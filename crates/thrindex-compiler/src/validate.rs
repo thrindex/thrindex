@@ -93,6 +93,15 @@ pub fn validate(model: &GraphModel) -> Result<(), CompileError> {
             GraphLayer::Conv2d(conv) => {
                 prev_out = Some((idx, conv.out_channels));
             }
+
+            GraphLayer::Flatten(_) => {
+                // Flatten changes the spatial layout but not in a way the current
+                // validator can track (spatial dims are not propagated in the IR).
+                // Reset prev_out so the following Dense layer's dimension check is
+                // skipped — the user is responsible for the correct in_features.
+                // Full shape tracking is deferred (M3 limitation).
+                prev_out = None;
+            }
         }
     }
 

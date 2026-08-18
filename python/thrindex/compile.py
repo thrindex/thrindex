@@ -27,6 +27,7 @@ import base64
 import json
 import struct
 import sys
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -49,7 +50,7 @@ def compile_model(
     model: nn.Module,
     path: str | Path,
     target: str = "sim",
-    version: str = "0.3.0",
+    version: str | None = None,
 ) -> None:
     """Compile *model* to a ``.thx`` artifact at *path*.
 
@@ -62,9 +63,20 @@ def compile_model(
     target:
         Target identifier.  ``"sim"`` is the only valid value for M3.
     version:
-        thrindex SDK version.  Used for informational metadata only; the Rust
-        compiler writes its own ``CARGO_PKG_VERSION`` into the artifact.
+        Deprecated — has no effect.  The Rust compiler writes its own
+        ``CARGO_PKG_VERSION`` into the artifact and this parameter is ignored.
+        Passing any value emits a :class:`DeprecationWarning`.  The parameter
+        will be removed in a future release.
     """
+    if version is not None:
+        warnings.warn(
+            "compile_model: the 'version' parameter is deprecated and has no effect. "
+            "The Rust compiler writes its own version into the artifact. "
+            "Remove 'version' from your compile_model call.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if not isinstance(model, Sequential):
         raise TypeError(
             f"compile_model expects a thrindex.snn.Sequential, got {type(model).__name__}"
@@ -103,9 +115,11 @@ def _serialise_layer_ir(layer: nn.Module) -> dict[str, Any]:
         return _serialise_conv2d_ir(layer)
     if isinstance(layer, LIF):
         return _serialise_lif_ir(layer)
+    if isinstance(layer, nn.Flatten):
+        return _serialise_flatten_ir(layer)
     raise TypeError(
         f"unsupported layer type for compile_model: {type(layer).__name__}. "
-        "Only Dense, Conv2d, and LIF are supported."
+        "Only Dense, Conv2d, LIF, and Flatten are supported."
     )
 
 
@@ -150,6 +164,15 @@ def _serialise_conv2d_ir(layer: ThxConv2d) -> dict[str, Any]:
         "padding": list(conv.padding),
         "weights_b64": _to_b64(w),
         "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
+    }
+
+
+def _serialise_flatten_ir(layer: nn.Flatten) -> dict[str, Any]:
+    # start_dim and end_dim are stored on nn.Flatten instances.
+    return {
+        "type": "flatten",
+        "start_dim": int(layer.start_dim),
+        "end_dim": int(layer.end_dim),
     }
 
 

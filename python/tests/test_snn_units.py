@@ -513,3 +513,63 @@ class TestRateLoss:
         assert losses[-1] < losses[0], (
             f"Loss did not decrease over 5 steps: {[f'{v:.4f}' for v in losses]}"
         )
+
+
+# ── accuracy ───────────────────────────────────────────────────────────────────
+
+
+class TestAccuracy:
+    """Unit tests for thrindex.train.accuracy."""
+
+    def test_perfect_accuracy(self) -> None:
+        from thrindex.train import accuracy
+
+        # 3 classes, batch=3. Each sample's correct class neuron spikes; others silent.
+        # spikes shape: [T=1, batch=3, n_classes=3]
+        spikes = torch.zeros(1, 3, 3)
+        spikes[0, 0, 0] = 10.0  # sample 0 → class 0
+        spikes[0, 1, 1] = 10.0  # sample 1 → class 1
+        spikes[0, 2, 2] = 10.0  # sample 2 → class 2
+        labels = torch.tensor([0, 1, 2])
+        assert accuracy(spikes, labels) == 1.0
+
+    def test_zero_accuracy(self) -> None:
+        from thrindex.train import accuracy
+
+        # All predictions wrong.
+        spikes = torch.zeros(1, 3, 3)
+        spikes[0, 0, 1] = 10.0  # sample 0 predicts class 1, true = 0
+        spikes[0, 1, 2] = 10.0  # sample 1 predicts class 2, true = 1
+        spikes[0, 2, 0] = 10.0  # sample 2 predicts class 0, true = 2
+        labels = torch.tensor([0, 1, 2])
+        assert accuracy(spikes, labels) == 0.0
+
+    def test_partial_accuracy(self) -> None:
+        from thrindex.train import accuracy
+
+        # 2 of 4 correct.
+        spikes = torch.zeros(1, 4, 2)
+        spikes[0, 0, 0] = 10.0  # correct (label 0)
+        spikes[0, 1, 0] = 10.0  # correct (label 0)
+        spikes[0, 2, 1] = 10.0  # wrong   (label 0, predicts 1)
+        spikes[0, 3, 1] = 10.0  # wrong   (label 0, predicts 1)
+        labels = torch.tensor([0, 0, 0, 0])
+        assert accuracy(spikes, labels) == 0.5
+
+    def test_returns_float(self) -> None:
+        from thrindex.train import accuracy
+
+        spikes = torch.zeros(5, 2, 3)
+        labels = torch.tensor([0, 1])
+        result = accuracy(spikes, labels)
+        assert isinstance(result, float), f"Expected float, got {type(result)}"
+
+    def test_multi_timestep_uses_rate(self) -> None:
+        from thrindex.train import accuracy
+
+        # T=10: class 0 fires 8 times, class 1 fires 2 times → predicts class 0.
+        spikes = torch.zeros(10, 1, 2)
+        spikes[:8, 0, 0] = 1.0   # class 0: 8 spikes
+        spikes[8:, 0, 1] = 1.0   # class 1: 2 spikes
+        labels = torch.tensor([0])
+        assert accuracy(spikes, labels) == 1.0

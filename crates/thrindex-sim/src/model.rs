@@ -93,6 +93,12 @@ pub(crate) struct Conv2dRaw {
     pub bias_b64: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct FlattenRaw {
+    pub start_dim: i32,
+    pub end_dim: i32,
+}
+
 // ── Resolved layer representations (weights decoded, ready for sim) ───────────
 
 /// A layer with weights fully decoded from base64 into `Vec<f32>`.
@@ -101,6 +107,7 @@ pub enum ResolvedLayer {
     Dense(DenseLayer),
     Lif(LifLayer),
     Conv2d(Conv2dLayer),
+    Flatten(FlattenLayer),
 }
 
 #[derive(Debug, Clone)]
@@ -139,6 +146,16 @@ pub struct Conv2dLayer {
     /// `[out_channels, in_channels, kernel_h, kernel_w]` row-major.
     pub weights: Vec<f32>,
     pub bias: Option<Vec<f32>>,
+}
+
+/// Flatten layer: reshape spatial output to a 1-D feature vector.
+///
+/// The simulator currently treats this as a no-op because simulation operates on
+/// 1-D feature vectors throughout.  Full spatial shape propagation is deferred (M3).
+#[derive(Debug, Clone)]
+pub struct FlattenLayer {
+    pub start_dim: i32,
+    pub end_dim: i32,
 }
 
 /// A fully-resolved, simulation-ready model.
@@ -375,9 +392,19 @@ fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, Sim
                 bias,
             }))
         }
+        "flatten" => {
+            let f: FlattenRaw =
+                serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
+                    detail: format!("layer[{idx}] flatten parse error: {e}"),
+                })?;
+            Ok(ResolvedLayer::Flatten(FlattenLayer {
+                start_dim: f.start_dim,
+                end_dim: f.end_dim,
+            }))
+        }
         other => Err(SimError::JsonParseError {
             detail: format!(
-                "layer[{idx}] unknown type \"{other}\"; expected \"dense\", \"lif\", or \"conv2d\""
+                "layer[{idx}] unknown type \"{other}\"; expected \"dense\", \"lif\", \"conv2d\", or \"flatten\""
             ),
         }),
     }
@@ -385,10 +412,11 @@ fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, Sim
 
 /// Returns `(input_features, output_features)` for dimension-continuity checking.
 /// LIF layers return `(None, None)` — they neither change nor consume the feature count.
+/// Flatten and Conv2d return `(None, None)` — spatial shape tracking is deferred (M3).
 fn layer_dims(layer: &ResolvedLayer) -> (Option<usize>, Option<usize>) {
     match layer {
         ResolvedLayer::Dense(d) => (Some(d.in_features), Some(d.out_features)),
         ResolvedLayer::Conv2d(c) => (Some(c.in_channels), Some(c.out_channels)),
-        ResolvedLayer::Lif(_) => (None, None),
+        ResolvedLayer::Lif(_) | ResolvedLayer::Flatten(_) => (None, None),
     }
 }

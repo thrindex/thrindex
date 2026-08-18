@@ -17,8 +17,9 @@ Canonical import::
 
 from thrindex.snn.conv2d import Conv2d
 from thrindex.snn.dense import Dense
+from thrindex.snn.flatten import Flatten
 from thrindex.snn.lif import LIF, LIFState
 from thrindex.snn.sequential import Sequential
 from thrindex.snn.surrogate import FastSigmoid
 
-__all__ = ["Conv2d", "Dense", "FastSigmoid", "LIF", "LIFState", "Sequential"]
+__all__ = ["Conv2d", "Dense", "FastSigmoid", "Flatten", "LIF", "LIFState", "Sequential"]
