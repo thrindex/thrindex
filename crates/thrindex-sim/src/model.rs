@@ -217,8 +217,10 @@ fn decode_weights(
     }
 
     Ok(bytes
-        .chunks_exact(4)
-        .map(|b| f32::from_le_bytes(b.try_into().expect("chunks_exact guarantees 4 bytes")))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f32::from_le_bytes(*b))
         .collect())
 }
 
@@ -509,8 +511,8 @@ fn decode_delays(
                     got_f32: bytes.len() / 2,
                 });
             }
-            for (slot, chunk) in delays.iter_mut().zip(bytes.chunks_exact(2)) {
-                *slot = u16::from_le_bytes([chunk[0], chunk[1]]);
+            for (slot, chunk) in delays.iter_mut().zip(bytes.as_chunks::<2>().0) {
+                *slot = u16::from_le_bytes(*chunk);
             }
         }
         "sparse" => {
@@ -522,7 +524,7 @@ fn decode_delays(
                     got_f32: bytes.len() / 6,
                 });
             }
-            for chunk in bytes.chunks_exact(6) {
+            for chunk in bytes.as_chunks::<6>().0 {
                 let index =
                     usize::try_from(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
                         .unwrap_or(usize::MAX);

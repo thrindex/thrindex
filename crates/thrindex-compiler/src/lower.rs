@@ -438,8 +438,10 @@ fn parse_u16_le(bytes: &[u8], layer_idx: usize) -> Result<Vec<u16>, CompileError
         });
     }
     Ok(bytes
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .collect())
 }
 
@@ -450,7 +452,9 @@ fn parse_sparse_pairs(bytes: &[u8], layer_idx: usize) -> Result<Vec<(u32, u16)>,
         });
     }
     Ok(bytes
-        .chunks_exact(6)
+        .as_chunks::<6>()
+        .0
+        .iter()
         .map(|c| {
             let idx = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
             let steps = u16::from_le_bytes([c[4], c[5]]);
