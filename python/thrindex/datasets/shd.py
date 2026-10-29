@@ -76,7 +76,7 @@ def load_shd(
     if split not in _URLS:
         raise ValueError(f"split={split!r} is not an SHD split; use 'train' or 'test'")
     try:
-        import h5py
+        import h5py  # pyright: ignore[reportMissingImports]
     except ImportError as exc:
         raise ImportError(
             "h5py is required to read SHD. Install it with: pip install 'thrindex[datasets]'"

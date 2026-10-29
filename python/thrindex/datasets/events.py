@@ -60,7 +60,7 @@ def load_cifar10_dvs(
     return _load_tonic("CIFAR10DVS", root, split, timesteps=timesteps, source="cifar10_dvs")
 
 
-def _as_torch_frame(sample: Tensor) -> Tensor:
+def tonic_frame_to_torch(sample: Tensor) -> Tensor:
     """Turn a tonic ``ToFrame`` array into ``[T, C, H, W]``.
 
     ``ToFrame`` documents its layout as ``(time, polarity, x, y)``.
@@ -86,8 +86,8 @@ def _load_tonic(
     if timesteps < 1:
         raise ValueError(f"timesteps={timesteps} must be at least 1")
     try:
-        import tonic
-        import tonic.transforms as transforms
+        import tonic  # pyright: ignore[reportMissingImports]
+        import tonic.transforms as transforms  # pyright: ignore[reportMissingImports]
     except ImportError as exc:
         raise ImportError(
             "tonic is required for event-camera datasets. "
@@ -109,7 +109,7 @@ def _load_tonic(
     labels: list[int] = []
     for index in range(len(dataset)):
         sample, label = dataset[index]
-        tensor = _as_torch_frame(torch.as_tensor(sample, dtype=torch.float32))
+        tensor = tonic_frame_to_torch(torch.as_tensor(sample, dtype=torch.float32))
         frames.append(tensor)
         labels.append(int(label))
     if not frames:

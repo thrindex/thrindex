@@ -40,8 +40,14 @@ fn two_dense_layers_stay_on_the_four_bit_grid() {
     assert!(report.advisory.is_none());
     let artifact: serde_json::Value = serde_json::from_str(&report.thx_json).unwrap();
     assert_eq!(artifact["target"], "sim");
-    assert_eq!(artifact["model"]["layers"][0]["bias_b64"], serde_json::Value::Null);
-    assert_eq!(artifact["model"]["layers"][1]["bias_b64"], serde_json::Value::Null);
+    assert_eq!(
+        artifact["model"]["layers"][0]["bias_b64"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        artifact["model"]["layers"][1]["bias_b64"],
+        serde_json::Value::Null
+    );
     assert_eq!(artifact["model"]["resource_report"]["input_shape"], 3);
     assert_eq!(artifact["model"]["resource_report"]["output_shape"], 2);
     assert_eq!(artifact["model"]["resource_report"]["lif_neuron_count"], 0);
@@ -131,7 +137,9 @@ fn four_bit_dense(input: &[f32], w1: &[f32], in1: usize, w2: &[f32], in2: usize)
 }
 
 fn int4_codes(weights: &[f32]) -> (Vec<i32>, f64) {
-    let max_abs = weights.iter().fold(0.0f64, |m, w| m.max(f64::from(*w).abs()));
+    let max_abs = weights
+        .iter()
+        .fold(0.0f64, |m, w| m.max(f64::from(*w).abs()));
     assert!(max_abs > 0.0);
     let scale = max_abs / 7.0;
     let codes = weights

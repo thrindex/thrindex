@@ -164,7 +164,8 @@ fn run_one_sample(model: &ResolvedModel, input: &[Vec<f32>]) -> Result<SampleRes
                 }
                 ResolvedLayer::Lif(lif) => {
                     if lif_states[i].is_none() {
-                        lif_states[i] = Some(LifState::zeros(act.values.len(), lif.alpha_syn.is_some()));
+                        lif_states[i] =
+                            Some(LifState::zeros(act.values.len(), lif.alpha_syn.is_some()));
                     }
                     let lif_state = lif_states[i].as_mut().expect("just initialised");
                     let spikes = lif_step(&act.values, lif_state, lif);

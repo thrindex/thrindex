@@ -17,7 +17,10 @@ use clap::{Parser, Subcommand};
 mod cmd;
 
 #[derive(Parser, Debug)]
-#[command(name = "thrindex", about = "Compile a spiking model and run it on the simulator")]
+#[command(
+    name = "thrindex",
+    about = "Compile a spiking model and run it on the simulator"
+)]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
     #[command(subcommand)]

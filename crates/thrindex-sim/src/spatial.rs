@@ -59,8 +59,24 @@ pub(crate) fn conv2d(
                 .into(),
         });
     }
-    let out_h = out_size(height, layer.padding[0], layer.dilation[0], layer.kernel_h, layer.stride[0], layer_idx, "height")?;
-    let out_w = out_size(width, layer.padding[1], layer.dilation[1], layer.kernel_w, layer.stride[1], layer_idx, "width")?;
+    let out_h = out_size(
+        height,
+        layer.padding[0],
+        layer.dilation[0],
+        layer.kernel_h,
+        layer.stride[0],
+        layer_idx,
+        "height",
+    )?;
+    let out_w = out_size(
+        width,
+        layer.padding[1],
+        layer.dilation[1],
+        layer.kernel_w,
+        layer.stride[1],
+        layer_idx,
+        "width",
+    )?;
     let in_per_group = layer.in_channels / layer.groups;
     let out_per_group = layer.out_channels / layer.groups;
     let mut output = vec![0.0_f32; layer.out_channels * out_h * out_w];
@@ -94,8 +110,9 @@ pub(crate) fn conv2d(
                             }
                             let in_c = channel_base + ic;
                             let sample = input.values[(in_c * height + y_in) * width + x_in];
-                            let weight = layer.weights
-                                [(((oc * in_per_group + ic) * layer.kernel_h + ky) * layer.kernel_w)
+                            let weight =
+                                layer.weights[(((oc * in_per_group + ic) * layer.kernel_h + ky)
+                                    * layer.kernel_w)
                                     + kx];
                             acc += weight * sample;
                             if sample > 0.5 {
@@ -138,12 +155,16 @@ pub(crate) fn flatten(
             fix: "set start_dim and end_dim the way nn.Flatten expects them".into(),
         });
     }
-    let product = dims[start..=end].iter().try_fold(1_usize, |acc, &dim| acc.checked_mul(dim)).ok_or_else(|| SimError::SpatialShape {
-        layer_idx,
-        message: "flattened dimension overflowed".into(),
-        reason: "the product of the flattened axes does not fit in a pointer-sized integer".into(),
-        fix: "reduce the spatial size of the frame".into(),
-    })?;
+    let product = dims[start..=end]
+        .iter()
+        .try_fold(1_usize, |acc, &dim| acc.checked_mul(dim))
+        .ok_or_else(|| SimError::SpatialShape {
+            layer_idx,
+            message: "flattened dimension overflowed".into(),
+            reason: "the product of the flattened axes does not fit in a pointer-sized integer"
+                .into(),
+            fix: "reduce the spatial size of the frame".into(),
+        })?;
     let mut next = Vec::new();
     next.extend_from_slice(&dims[..start]);
     next.push(product);
@@ -161,7 +182,8 @@ pub(crate) fn flatten(
     Err(SimError::SpatialShape {
         layer_idx,
         message: format!("flatten produced rank {}", dims.len()),
-        reason: "the simulator runs a flat vector or a single image, not an arbitrary reshape".into(),
+        reason: "the simulator runs a flat vector or a single image, not an arbitrary reshape"
+            .into(),
         fix: "flatten from the first non-batch dimension through the end (the nn.Flatten default)"
             .into(),
     })
@@ -205,7 +227,9 @@ fn out_size(
     if stride == 0 || dilation == 0 || kernel == 0 {
         return Err(SimError::SpatialShape {
             layer_idx,
-            message: format!("Conv2d {axis} has stride={stride}, dilation={dilation}, kernel={kernel}"),
+            message: format!(
+                "Conv2d {axis} has stride={stride}, dilation={dilation}, kernel={kernel}"
+            ),
             reason: "those convolution parameters must be at least 1".into(),
             fix: "recompile from a snn.Conv2d with positive kernel, stride, and dilation".into(),
         });
@@ -234,7 +258,8 @@ fn normalize_dim(dim: i32, rank: i32, layer_idx: usize) -> Result<usize, SimErro
         return Err(SimError::SpatialShape {
             layer_idx,
             message: format!("flatten dimension {dim} is outside rank {rank}"),
-            reason: "start_dim and end_dim are indexed the way torch.nn.Flatten indexes them".into(),
+            reason: "start_dim and end_dim are indexed the way torch.nn.Flatten indexes them"
+                .into(),
             fix: "use the default Flatten(), which flattens every dimension after the batch".into(),
         });
     }

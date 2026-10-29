@@ -523,15 +523,16 @@ fn decode_delays(
                 });
             }
             for chunk in bytes.chunks_exact(6) {
-                let index = usize::try_from(u32::from_le_bytes([
-                    chunk[0], chunk[1], chunk[2], chunk[3],
-                ]))
-                .unwrap_or(usize::MAX);
+                let index =
+                    usize::try_from(u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+                        .unwrap_or(usize::MAX);
                 let steps = u16::from_le_bytes([chunk[4], chunk[5]]);
                 let Some(slot) = delays.get_mut(index) else {
                     return Err(SimError::SpatialShape {
                         layer_idx,
-                        message: format!("sparse delay index {index} is outside 0..{n_connections}"),
+                        message: format!(
+                            "sparse delay index {index} is outside 0..{n_connections}"
+                        ),
                         reason: "each pair addresses one dense connection".into(),
                         fix: "recompile the model".into(),
                     });

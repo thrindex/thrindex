@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import torch
 from thrindex.datasets import bin_shd_units, load_shd
-from thrindex.datasets.events import _as_torch_frame, load_cifar10_dvs
+from thrindex.datasets.events import load_cifar10_dvs, tonic_frame_to_torch
 
 
 def test_shd_bin_places_a_spike_in_the_right_channel() -> None:
@@ -36,7 +36,7 @@ def test_shd_bin_clips_a_spike_past_the_window() -> None:
 
 def test_load_shd_reads_the_hdf5_layout(tmp_path: Path) -> None:
     h5py = pytest.importorskip("h5py")
-    import numpy as np
+    import numpy as np  # pyright: ignore[reportMissingImports]
 
     path = tmp_path / "shd_train.h5"
     times = [np.array([0.0, 0.14], dtype=np.float32), np.array([], dtype=np.float32)]
@@ -60,7 +60,7 @@ def test_load_shd_reads_the_hdf5_layout(tmp_path: Path) -> None:
 def test_tonic_frame_swaps_width_and_height() -> None:
     # ToFrame layout is (T, C, W, H). A 2-wide, 3-tall image.
     frame = torch.arange(6, dtype=torch.float32).reshape(1, 1, 2, 3)
-    out = _as_torch_frame(frame)
+    out = tonic_frame_to_torch(frame)
     assert out.shape == (1, 1, 3, 2)
     assert out[0, 0, 1, 0].item() == frame[0, 0, 0, 1].item()
 
