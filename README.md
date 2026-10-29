@@ -6,7 +6,7 @@
 
 <br/>
 
-**The open compiler for spiking neuromorphic compute.**  
+**The open neuromorphic compute engine.**  
 Author spiking neural networks in Python. Compile them to neuromorphic hardware.
 
 <br/>
