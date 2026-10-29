@@ -29,10 +29,14 @@
 //! | Field | When `None` | Rule |
 //! |---|---|---|
 //! | `dt_ms` | → absent | `skip_serializing_if` (absent in pre-M3 artifacts) |
+//! | `capability_hash` | → absent | `skip_serializing_if` (absent in files compiled before the geometry record) |
+//! | `resource_report` | → absent | `skip_serializing_if` (same files) |
 //!
 //! Layer-level option handling is managed per-Value in the raw JSON.
 
 use serde::{Deserialize, Serialize};
+
+use crate::resource::ResourceSummary;
 
 // ── Top-level artifact ────────────────────────────────────────────────────────
 
@@ -57,6 +61,9 @@ pub struct WireArtifact {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WireModel {
     pub layers: Vec<serde_json::Value>,
+    /// Present on files compiled after the geometry record. Absent on older files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_report: Option<ResourceSummary>,
 }
 
 /// The `metadata` block.
@@ -71,4 +78,8 @@ pub struct WireMetadata {
     pub crc32: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dt_ms: Option<f64>,
+    /// SHA-256 of the sim lower descriptor. Absent on older files.
+    /// Not a chip identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_hash: Option<String>,
 }

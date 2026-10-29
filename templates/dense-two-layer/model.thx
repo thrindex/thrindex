@@ -1,0 +1,42 @@
+{
+  "format_version": "m2-draft",
+  "thrindex_version": "0.3.0",
+  "target": "sim",
+  "model": {
+    "layers": [
+      {
+        "bias_b64": null,
+        "in_features": 3,
+        "out_features": 2,
+        "type": "dense",
+        "weights_b64": "AADgQAAAAAAAAAAAAAAAAAAAQEAAAIA/"
+      },
+      {
+        "bias_b64": null,
+        "in_features": 2,
+        "out_features": 2,
+        "type": "dense",
+        "weights_b64": "AACAPwAAgEAAAOBAAAAAAA=="
+      }
+    ],
+    "resource_report": {
+      "layer_count": 2,
+      "lif_neuron_count": 0,
+      "total_weight_count": 10,
+      "has_delays": false,
+      "layer_types": [
+        "dense",
+        "dense"
+      ],
+      "input_shape": 3,
+      "output_shape": 2
+    }
+  },
+  "metadata": {
+    "compiled_at": "2026-10-23T11:12:59Z",
+    "model_canonical": "{\"layers\":[{\"bias_b64\":null,\"in_features\":3,\"out_features\":2,\"type\":\"dense\",\"weights_b64\":\"AADgQAAAAAAAAAAAAAAAAAAAQEAAAIA/\"},{\"bias_b64\":null,\"in_features\":2,\"out_features\":2,\"type\":\"dense\",\"weights_b64\":\"AACAPwAAgEAAAOBAAAAAAA==\"}],\"resource_report\":{\"has_delays\":false,\"input_shape\":3,\"layer_count\":2,\"layer_types\":[\"dense\",\"dense\"],\"lif_neuron_count\":0,\"output_shape\":2,\"total_weight_count\":10}}",
+    "crc32": "e2a130fa",
+    "dt_ms": 1.0,
+    "capability_hash": "1d57e82fa15a698cd842baf05546b1e0e86ac9277c9c3370bfb9900c62711715"
+  }
+}

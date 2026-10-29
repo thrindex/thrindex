@@ -2,8 +2,9 @@
 
 A thin wrapper around :class:`torch.nn.Linear` that fits into a
 :class:`~thrindex.snn.sequential.Sequential` temporal unrolling loop.
-No internal recurrent state — the layer is called once per timestep with
-the current spike (or current) input.
+The layer itself holds no recurrent buffer. A non-zero ``delay`` asks
+``Sequential`` to feed it the input from that many timesteps ago, the same
+shift the simulator applies after compile.
 """
 
 from __future__ import annotations
@@ -30,10 +31,25 @@ class Dense(nn.Module):
         Size of each output sample.
     bias:
         If ``True`` (default), adds a learnable bias.
+    delay:
+        Synaptic delay in timesteps, applied to every connection. ``0`` stores
+        no delay bytes in the artifact. The value must fit in a ``u16``.
     """
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = True) -> None:
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        delay: int = 0,
+    ) -> None:
         super().__init__()
+        if delay < 0 or delay > 65535:
+            raise ValueError(
+                f"delay={delay} must be an integer timestep in 0..=65535. "
+                "The artifact stores each connection delay as a u16."
+            )
+        self.delay = delay
         self.linear = nn.Linear(in_features, out_features, bias=bias)
 
     def forward(self, x: Tensor) -> Tensor:

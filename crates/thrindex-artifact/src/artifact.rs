@@ -5,7 +5,7 @@ use crate::{
     integrity,
     layers::{self, Layer},
     resource::{self, ResourceSummary},
-    wire::{WireArtifact, WireMetadata},
+    wire::WireArtifact,
 };
 
 /// Format version strings this crate can parse.
@@ -15,17 +15,15 @@ pub const SUPPORTED_VERSIONS: &[&str] = &["m2-draft"];
 ///
 /// Construct via [`crate::parse`] or [`crate::parse_bytes`].
 ///
-/// ## What is NOT available from `m2-draft`
+/// ## Declared geometry
 ///
-/// The following fields are required by the Platform but absent from the
-/// current format.  They are proposed as additions in `m2-platform`
-/// (see module documentation in `lib.rs`):
+/// Newer files store `model.resource_report` and `metadata.capability_hash`.
+/// Older files omit both. [`Self::resource_summary`] is the geometry either
+/// way: the stored report when it is present (parse already checked it
+/// against the layers), otherwise a derivation from the layers.
 ///
-/// - `input_shape` / `output_shape` — derived by this crate from layer shapes
-/// - `resource_report` — derived (imprecise; missing chip scheduling data)
-/// - `capability_hash` — which chip capability descriptor was used; not stored
-/// - `source_hash` — Python source identity; not stored
-/// - signing fields — deferred to M5 / `m3-signed` format
+/// `source_hash` is not stored. Compile does not receive a source file.
+/// Signing is applied by the Console to the uploaded bytes, not inside this format.
 #[derive(Debug, Clone)]
 pub struct Artifact {
     wire: WireArtifact,
@@ -78,6 +76,18 @@ impl Artifact {
     /// This is the content fingerprint the Platform stores in `artifacts.content_hash`.
     pub fn content_hash(&self) -> &str {
         &self.content_hash
+    }
+
+    /// SHA-256 of the sim lower descriptor, when the compiler recorded one.
+    ///
+    /// `None` on files compiled before that field existed. This is not a chip id.
+    pub fn capability_hash(&self) -> Option<&str> {
+        self.wire.metadata.capability_hash.as_deref()
+    }
+
+    /// Whether the file states its own geometry in `model.resource_report`.
+    pub fn has_resource_report(&self) -> bool {
+        self.wire.model.resource_report.is_some()
     }
 
     // ── Layer access ──────────────────────────────────────────────────────────
@@ -141,18 +151,16 @@ impl Artifact {
 
     // ── Platform-derived data ─────────────────────────────────────────────────
 
-    /// Derive resource figures from the layer geometry.
+    /// Geometry of the model.
     ///
-    /// These are **estimates** for WS-1 verification.  The `m2-platform`
-    /// format bump will add a compiler-declared `resource_report` that
-    /// supersedes this.
+    /// When the file includes `resource_report`, that is the value, and parse
+    /// has already required it to match the layers. Otherwise the figures are
+    /// derived from the layers.
     pub fn resource_summary(&self) -> ResourceSummary {
-        resource::derive(&self.wire.model.layers)
-    }
-
-    // ── Crate-internal ────────────────────────────────────────────────────────
-
-    pub(crate) fn raw_metadata(&self) -> &WireMetadata {
-        &self.wire.metadata
+        self.wire
+            .model
+            .resource_report
+            .clone()
+            .unwrap_or_else(|| resource::summarize_layers(&self.wire.model.layers))
     }
 }

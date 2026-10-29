@@ -21,6 +21,7 @@ Rules:
 | E0008 | Artifact JSON parse error | `thrindex-sim` |
 | E0009 | Artifact CRC32 integrity failure | `thrindex-sim` |
 | E0010 | Input dimension mismatch | `thrindex-sim` |
+| E0011 | Spatial layer cannot be executed | `thrindex-sim` |
 
 ## M3 codes (E0101 – E0109)
 
@@ -56,7 +57,6 @@ Rules:
 | E0001 – E0099 | M2 (sim + CLI) |
 | E0100 – E0199 | M3 (compiler / Graph IR) |
 | E0200 – E0299 | M4 (conformance, quantisation) |
-| E0300 – E0399 | M5 (hardware targets) |
 
 ## Format
 

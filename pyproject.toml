@@ -27,6 +27,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -67,6 +68,11 @@ examples = [
     "torchvision>=0.15",
     # h5py: SHD training script (templates/keyword-spotting/train.py).
     "h5py>=3.0",
+]
+datasets = [
+    # SHD .h5 files and the tonic event-camera datasets.
+    "h5py>=3.0",
+    "tonic>=1.4",
 ]
 
 [tool.maturin]

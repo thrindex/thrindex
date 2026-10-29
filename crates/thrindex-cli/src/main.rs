@@ -8,7 +8,6 @@
 //!   thrindex run <model.thx> [--seed N] [--threads N]
 //!   thrindex bench --conformance --target sim [--artifact F] [--fixtures D]
 //!   thrindex doctor [--check <model.thx>] [--verbose]
-//!   thrindex targets
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -18,7 +17,7 @@ use clap::{Parser, Subcommand};
 mod cmd;
 
 #[derive(Parser, Debug)]
-#[command(name = "thrindex", about = "The neuromorphic infrastructure SDK")]
+#[command(name = "thrindex", about = "Compile a spiking model and run it on the simulator")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
     #[command(subcommand)]
@@ -33,8 +32,6 @@ enum Commands {
     Bench(cmd::bench::BenchArgs),
     /// Diagnose the environment.
     Doctor(cmd::doctor::DoctorArgs),
-    /// List available simulation targets.
-    Targets(cmd::targets::TargetsArgs),
 }
 
 fn main() {
@@ -57,10 +54,6 @@ fn main() {
         },
         Commands::Doctor(args) => {
             print!("{}", cmd::doctor::run(args));
-            Ok(())
-        }
-        Commands::Targets(args) => {
-            print!("{}", cmd::targets::run(args));
             Ok(())
         }
     };

@@ -9,21 +9,21 @@
 //! Integrity is a CRC32 over a sorted-key canonical JSON representation of
 //! the model block.  Signing is deferred to M5 (`m3-signed` format).
 //!
-//! ## Format gaps (proposed `m2-platform` bump)
+//! ## What a new compile records
 //!
-//! The following fields are **missing** from `m2-draft` for Platform use.
-//! They are derived by this crate from layer shapes as a stopgap; the
-//! compiler must be updated to emit them as `m2-platform`:
+//! `format_version` stays `m2-draft`. New files add two optional fields.
+//! Files that omit them still parse. The simulator ignores both.
 //!
-//! | Gap | Platform need | WS-1 workaround |
+//! | Field | Where | Meaning |
 //! |---|---|---|
-//! | `input_shape` | Run verification inference | Derived from first layer `in_features` |
-//! | `output_shape` | Declare expected output | Derived from last Dense `out_features` |
-//! | `resource_report.weight_count` | Synapse budget check | Derived from weight tensor shapes |
-//! | `resource_report.lif_neuron_count` | Neuron budget check | Derived from preceding Dense `out_features` |
-//! | `capability_hash` | Verify correct chip descriptor used | Not available; check deferred |
-//! | `source_hash` | Full provenance chain | Not available; `thrindex_version` only |
-//! | Signing fields | Authenticity + non-repudiation | Not available; deferred to M5 |
+//! | `model.resource_report` | inside the CRC'd model block | Geometry the compiler computed from the layers: shapes, weight count, LIF count. On parse it must match a fresh derivation from `layers`. A report that disagrees with the layers is rejected. |
+//! | `metadata.capability_hash` | metadata | SHA-256 of the **sim** lower descriptor (`dt`, delay cap, float32). This is not a chip id. `thx.compile` only lowers for `sim`. |
+//!
+//! `source_hash` is intentionally absent. `thx.compile` receives an in-memory
+//! model, not a source file. Hashing a file we do not have would be a false
+//! provenance claim. `thrindex_version` identifies the toolchain.
+//!
+//! Signing fields are still absent. The Console signs the uploaded bytes.
 //!
 //! ## Usage
 //!
@@ -49,8 +49,9 @@ mod wire;
 
 pub use artifact::{Artifact, SUPPORTED_VERSIONS};
 pub use error::ArtifactError;
+pub use integrity::{expected_sim_capability_hash, hash_lower_capability};
 pub use layers::{Conv2dLayer, DenseLayer, FlattenLayer, Layer, LifLayer};
-pub use resource::ResourceSummary;
+pub use resource::{ResourceSummary, summarize_layers};
 
 /// Parse a `.thx` artifact from a UTF-8 string.
 ///
@@ -94,12 +95,12 @@ pub fn parse_bytes(bytes: &[u8]) -> Result<Artifact, ArtifactError> {
         });
     }
 
-    let artifact = Artifact::from_wire(wire, content_hash);
+    integrity::verify_crc32(&wire.metadata.model_canonical, &wire.metadata.crc32)?;
 
-    integrity::verify_crc32(
-        artifact.raw_metadata().model_canonical.as_str(),
-        artifact.raw_metadata().crc32.as_str(),
-    )?;
+    if let Some(report) = wire.model.resource_report.as_ref() {
+        resource::check_report(report, &wire.model.layers)?;
+    }
+    integrity::check_capability_hash(&wire.target, wire.metadata.capability_hash.as_deref())?;
 
-    Ok(artifact)
+    Ok(Artifact::from_wire(wire, content_hash))
 }

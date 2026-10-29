@@ -14,6 +14,7 @@ use crc32fast::Hasher as Crc32Hasher;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use thrindex_artifact::{hash_lower_capability, summarize_layers};
 use thrindex_ir::{Delays, GraphLayer, GraphModel, ResetMode};
 
 use crate::error::CompileError;
@@ -39,6 +40,15 @@ pub enum DelayFallback {
     Emulate,
     /// Reject with `E0103`/`E0104`.
     Reject,
+}
+
+impl DelayFallback {
+    fn as_str(&self) -> &'static str {
+        match self {
+            DelayFallback::Emulate => "emulate",
+            DelayFallback::Reject => "reject",
+        }
+    }
 }
 
 fn capability_for(target: &str) -> Result<SimCapability, CompileError> {
@@ -84,6 +94,7 @@ struct ThxArtifact {
 #[derive(Serialize, Deserialize)]
 struct ThxModel {
     layers: Vec<Value>,
+    resource_report: thrindex_artifact::ResourceSummary,
 }
 
 /// Metadata block inside a `.thx` artifact.
@@ -95,6 +106,8 @@ struct ThxMetadata {
     crc32: String,
     /// Authored `dt_ms` from the Graph IR (ADR-0008 extension to ADR-0006 metadata).
     dt_ms: f64,
+    /// SHA-256 of the sim lower descriptor. Not a chip id.
+    capability_hash: String,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -137,16 +150,32 @@ pub fn lower(model: &GraphModel, target: &str) -> Result<CompileReport, CompileE
                 lower_dense(dense, idx, authored_dt, target_dt, &cap, &mut thx_layers)?;
                 continue;
             }
-            GraphLayer::Lif(lif) => lower_lif(lif, idx, target_dt)?,
-            GraphLayer::Conv2d(conv) => lower_conv2d(conv),
-            GraphLayer::Flatten(flatten) => lower_flatten(flatten),
+            GraphLayer::Lif(lif) => alphabetical_keys(lower_lif(lif, idx, target_dt)?),
+            GraphLayer::Conv2d(conv) => alphabetical_keys(lower_conv2d(conv)),
+            GraphLayer::Flatten(flatten) => alphabetical_keys(lower_flatten(flatten)),
         };
         thx_layers.push(v);
     }
 
-    let thx_model = ThxModel { layers: thx_layers };
+    let resource_report = summarize_layers(&thx_layers);
+    let capability_hash = hash_lower_capability(
+        target,
+        cap.native_dt_ms,
+        cap.native_delay_max_steps,
+        cap.delay_fallback.as_str(),
+        "float32",
+    )
+    .ok_or_else(|| CompileError::IrJsonParseError {
+        detail: "cannot record the sim capability hash: native_dt_ms is not finite".into(),
+    })?;
+
+    let thx_model = ThxModel {
+        layers: thx_layers,
+        resource_report,
+    };
 
     // CRC32 is computed on the canonically serialized model block (sorted keys).
+    // `resource_report` is inside that block, so an edited geometry breaks the CRC.
     let model_canonical = canonical_json(&serde_json::to_value(&thx_model).map_err(|e| {
         CompileError::IrJsonParseError {
             detail: e.to_string(),
@@ -169,6 +198,7 @@ pub fn lower(model: &GraphModel, target: &str) -> Result<CompileReport, CompileE
             model_canonical,
             crc32: format!("{crc32:08x}"),
             dt_ms: authored_dt,
+            capability_hash,
         },
     };
 
@@ -213,7 +243,7 @@ fn lower_dense(
         obj["delays_encoding"] = Value::String(encoding);
     }
 
-    out.push(obj);
+    out.push(alphabetical_keys(obj));
     Ok(())
 }
 
@@ -253,7 +283,7 @@ fn lower_lif(
 }
 
 fn lower_conv2d(conv: &thrindex_ir::GraphConv2d) -> Value {
-    serde_json::json!({
+    let mut layer = serde_json::json!({
         "type": "conv2d",
         "in_channels": conv.in_channels,
         "out_channels": conv.out_channels,
@@ -263,7 +293,16 @@ fn lower_conv2d(conv: &thrindex_ir::GraphConv2d) -> Value {
         "padding": conv.padding,
         "weights_b64": conv.weights_b64,
         "bias_b64": conv.bias_b64,
-    })
+        "groups": conv.groups,
+        "dilation": conv.dilation,
+    });
+    if let Some(height) = conv.input_height {
+        layer["input_height"] = serde_json::json!(height);
+    }
+    if let Some(width) = conv.input_width {
+        layer["input_width"] = serde_json::json!(width);
+    }
+    layer
 }
 
 fn lower_flatten(flatten: &thrindex_ir::GraphFlatten) -> Value {
@@ -431,6 +470,26 @@ fn encode_sparse_pairs(pairs: &[(u32, u16)]) -> String {
         .flat_map(|(idx, steps)| idx.to_le_bytes().into_iter().chain(steps.to_le_bytes()))
         .collect();
     B64.encode(&bytes)
+}
+
+/// Object keys in alphabetical order.
+///
+/// `json!` follows `serde_json`'s map order. That order is alphabetical unless
+/// `preserve_order` is enabled on the shared `serde_json` (the artifact crate
+/// enables it). Sorting here keeps layer objects stable either way.
+fn alphabetical_keys(value: Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut entries: Vec<(String, Value)> = map
+                .into_iter()
+                .map(|(key, child)| (key, alphabetical_keys(child)))
+                .collect();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            Value::Object(entries.into_iter().collect())
+        }
+        Value::Array(items) => Value::Array(items.into_iter().map(alphabetical_keys).collect()),
+        other => other,
+    }
 }
 
 // ── Canonical JSON (sorted keys) ──────────────────────────────────────────────

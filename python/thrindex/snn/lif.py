@@ -75,8 +75,10 @@ class LIF(nn.Module):
         Reset mode after a spike.  ``"subtract"`` (membrane −= threshold) or
         ``"zero"`` (membrane → 0).  See ``adr/0004`` for the precise definitions.
     delay:
-        Synaptic transmission delay in timesteps.  Only ``0`` is supported in M1;
-        any other value raises ``NotImplementedError`` pointing at RFC-002.
+        Accepted only as ``0``. Synaptic delay is a property of the connection,
+        so it lives on :class:`~thrindex.snn.dense.Dense` (``delay=`` steps).
+        A non-zero value here raises ``NotImplementedError`` rather than
+        silently ignoring a delay this layer does not apply.
     beta:
         Slope of the fast-sigmoid surrogate gradient.  Default 25 matches the
         snnTorch reference implementation for the benchmark in ``docs/validation.md``.
@@ -160,6 +162,28 @@ class LIF(nn.Module):
             syn_t = None
             mem_t = self.alpha * mem_prev + x
 
+        spk, mem_out = self._fire_and_reset(mem_t)
+        return spk, LIFState(mem=mem_out, syn=syn_t)
+
+    def step(self, x: Tensor, state: LIFState) -> tuple[Tensor, LIFState, Tensor]:
+        """Like :meth:`forward`, and also return the membrane compared with threshold.
+
+        ``mem_t`` is the value *before* reset. That is the potential that decided
+        the spike. The membrane carried to the next timestep is ``state.mem``.
+        """
+        spk, new_state = self.forward(x, state)
+        # forward already stored the post-reset membrane. Recompute mem_t from
+        # the same inputs so the recorded trace cannot drift from the spike.
+        mem_prev = state.mem
+        if self.tau_syn is not None and self.alpha_syn is not None:
+            syn_prev = state.syn if state.syn is not None else torch.zeros_like(x)
+            syn_t = self.alpha_syn * syn_prev + x
+            mem_t = self.alpha * mem_prev + syn_t
+        else:
+            mem_t = self.alpha * mem_prev + x
+        return spk, new_state, mem_t
+
+    def _fire_and_reset(self, mem_t: Tensor) -> tuple[Tensor, Tensor]:
         # (ii) Fire: Heaviside forward, fast-sigmoid surrogate backward.
         # Function.apply is typed as (...) -> Unknown in torch stubs; cast explicitly.
         spk: Tensor = FastSigmoid.apply(mem_t - self.threshold, self.beta)  # type: ignore[assignment]
@@ -172,8 +196,7 @@ class LIF(nn.Module):
             # spk.detach() severs the gradient through the reset gate — gradients
             # must flow via the surrogate spike path, not the reset mask.
             mem_out = mem_t * (1.0 - spk.detach())
-
-        return spk, LIFState(mem=mem_out, syn=syn_t)
+        return spk, mem_out
 
     def extra_repr(self) -> str:
         parts = [

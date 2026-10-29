@@ -10,7 +10,7 @@
     "snn_pj_per_syn_op": 0.5,
     "mlp_gpu_pj_per_mac": 2.56,
     "mlp_cpu_pj_per_mac": 1.0,
-    "snn_reference": "7nm neuromorphic silicon (consistent with published figures)",
+    "snn_reference": "published literature estimate, not a device measurement",
     "gpu_reference": "NVIDIA A100 \u2014 400W TDP / (2 \u00d7 156 TMAC/s) \u2248 2.56 pJ/MAC",
     "cpu_reference": "ARM Cortex class CPU \u2014 1.0 pJ/MAC (conservative 7nm estimate)"
   },

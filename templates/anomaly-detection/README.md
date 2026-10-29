@@ -3,7 +3,7 @@
 Demonstrates spiking neural network–based anomaly detection on a 128-channel
 synthetic sensor array.  The model is a binary classifier (normal vs. anomaly)
 trained entirely in PyTorch with surrogate gradients and compiled to a sealed
-`.thx` artifact for deployment on neuromorphic hardware.
+`.thx` file the simulator can run.
 
 **No external dataset download required** — the synthetic data generator is
 self-contained and produces reproducible train/test splits seeded by `SEED = 0`.

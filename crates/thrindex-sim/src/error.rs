@@ -125,4 +125,18 @@ pub enum SimError {
          Docs: https://docs.thrindex.com/errors/E0010"
     )]
     InputDimensionMismatch { expected: usize, got: usize },
+
+    /// E0011 — a spatial layer cannot be executed with the shape it was given.
+    #[error(
+        "E0011: cannot execute layer {layer_idx}: {message}\n\
+         Why: {reason}\n\
+         Fix: {fix}\n\
+         Docs: https://docs.thrindex.com/errors/E0011"
+    )]
+    SpatialShape {
+        layer_idx: usize,
+        message: String,
+        reason: String,
+        fix: String,
+    },
 }

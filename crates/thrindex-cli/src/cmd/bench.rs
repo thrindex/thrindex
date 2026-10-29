@@ -47,8 +47,7 @@ pub struct BenchArgs {
     #[arg(long, default_value_t = false)]
     pub conformance: bool,
 
-    /// Execution target to test against the reference simulator. Currently only "sim"
-    /// is available; hardware targets will be added in M5+.
+    /// Must be `sim`. The conformance run compares the simulator with itself.
     #[arg(long, default_value = "sim")]
     pub target: String,
 
@@ -75,9 +74,8 @@ pub fn run(args: &BenchArgs) -> Result<String, String> {
 
     if args.target != "sim" {
         return Err(format!(
-            "thrindex bench: target '{}' is not yet available.\n\
-             Currently only '--target sim' is supported (M4).\n\
-             Hardware targets are planned for M5+.",
+            "thrindex bench: target '{}' is not supported.\n\
+             The only value is '--target sim'.",
             args.target
         ));
     }

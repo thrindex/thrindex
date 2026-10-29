@@ -17,7 +17,7 @@ pub struct RunArgs {
     #[arg(long, default_value = "0")]
     pub seed: u64,
 
-    /// Number of threads.  0 = Rayon default (hardware concurrency).
+    /// Number of threads.  0 = all CPUs.
     #[arg(long, default_value = "0")]
     pub threads: usize,
 }

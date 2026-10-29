@@ -1,0 +1,22 @@
+{
+  "format_version": "m2-draft",
+  "thrindex_version": "0.3.0",
+  "target": "sim",
+  "model": {
+    "layers": [
+      {
+        "bias_b64": null,
+        "in_features": 4,
+        "out_features": 2,
+        "type": "dense",
+        "weights_b64": "AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAA="
+      }
+    ]
+  },
+  "metadata": {
+    "compiled_at": "2026-09-20T15:00:06Z",
+    "model_canonical": "{\"layers\":[{\"bias_b64\":null,\"in_features\":4,\"out_features\":2,\"type\":\"dense\",\"weights_b64\":\"AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAA=\"}]}",
+    "crc32": "9161dfc0",
+    "dt_ms": 1.0
+  }
+}

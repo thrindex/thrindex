@@ -65,54 +65,17 @@ SEED = 0
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
 def _load_shd(data_dir: Path, split: str) -> tuple[torch.Tensor, torch.Tensor]:
-    """Load SHD split and bin spike times into T=100 timesteps.
+    """Load SHD split and bin spike times into T timesteps.
 
     Downloads automatically on first run if the .h5 file is absent.
     """
+    from thrindex.datasets import load_shd
+
     try:
-        import h5py
-    except ImportError:
-        sys.exit("h5py required: pip install h5py")
-
-    url_map = {
-        "train": "https://zenkelab.org/datasets/shd_train.h5.gz",
-        "test": "https://zenkelab.org/datasets/shd_test.h5.gz",
-    }
-
-    h5_path = data_dir / f"shd_{split}.h5"
-    if not h5_path.exists():
-        _download_shd(url_map[split], data_dir, split)
-
-    with h5py.File(h5_path, "r") as f:
-        spike_times = f["spikes"]["times"][:]   # list of arrays
-        spike_units = f["spikes"]["units"][:]   # list of arrays
-        labels = torch.tensor(f["labels"][:], dtype=torch.long)
-
-    max_time = 1.4  # SHD recordings are ~1.4 seconds
-    dt = max_time / T
-    n = len(labels)
-    spike_tensor = torch.zeros(n, T, N_IN)
-
-    for i in range(n):
-        t_idx = (spike_times[i] / dt).astype("int64").clip(0, T - 1)
-        u_idx = spike_units[i].astype("int64").clip(0, N_IN - 1)
-        spike_tensor[i, t_idx, u_idx] = 1.0
-
-    return spike_tensor, labels
-
-
-def _download_shd(url: str, data_dir: Path, split: str) -> None:
-    import gzip
-    import urllib.request
-
-    data_dir.mkdir(parents=True, exist_ok=True)
-    gz_path = data_dir / f"shd_{split}.h5.gz"
-    print(f"Downloading {url} …")
-    urllib.request.urlretrieve(url, gz_path)
-    with gzip.open(gz_path, "rb") as gz_f:
-        (data_dir / f"shd_{split}.h5").write_bytes(gz_f.read())
-    gz_path.unlink()
-    print("Done.")
+        loaded = load_shd(data_dir, split, timesteps=T, n_units=N_IN)
+    except ImportError as exc:
+        sys.exit(str(exc))
+    return loaded.spikes, loaded.labels
 
 
 # ── Model ──────────────────────────────────────────────────────────────────────

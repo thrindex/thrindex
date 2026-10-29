@@ -7,7 +7,6 @@ Subcommands
 -----------
 run      Load a .thx artifact, run the behavioral simulator, print §29 transcript.
 doctor   Diagnose the environment (Python version, wheel integrity, torch presence).
-targets  List available simulation targets.
 """
 
 from __future__ import annotations
@@ -196,7 +195,7 @@ def _cmd_run(argv: list[str]) -> None:
         "--threads",
         type=int,
         default=0,
-        help="Thread count (0 = hardware default).",
+        help="Thread count (0 = all CPUs).",
     )
     args = parser.parse_args(argv)
 
@@ -337,22 +336,6 @@ def _cmd_doctor(argv: list[str]) -> None:
     print(border)
 
 
-def _cmd_targets(argv: list[str]) -> None:
-    border = "═" * 55
-    print(border)
-    print(f" thrindex {_sdk_version()}  —  available targets")
-    print(border)
-    print(" sim               Behavioral simulator")
-    print("                   Precision: float32  |  ADR-0007")
-    print("                   Deterministic, CPU-parallel (Rayon)")
-    print("─" * 55)
-    print(" akida-akd1500     BrainChip AKD1500 neuromorphic chip")
-    print("                   Precision: int4  |  RFC-004 / ADR-0011")
-    print("                   Requires: --features hardware + Engine Library")
-    print("                   Note: LIF layers rejected (non-SNN backend)")
-    print(border)
-
-
 def _sdk_version() -> str:
     try:
         from importlib.metadata import version
@@ -378,8 +361,6 @@ def main() -> None:
         _cmd_run(rest)
     elif subcommand in ("doctor",):
         _cmd_doctor(rest)
-    elif subcommand in ("targets",):
-        _cmd_targets(rest)
     elif subcommand in ("--version", "-V"):
         print(_sdk_version())
     else:
@@ -399,7 +380,6 @@ def _print_help() -> None:
         "  run <model.thx>            Run the behavioral simulator\n"
         "  run <model.thx> --input FILE   Run with spike input from a JSON file\n"
         "  doctor                     Diagnose the installation\n"
-        "  targets                    List available simulation targets\n"
         "\n"
         "Run `thrindex <subcommand> --help` for subcommand options."
     )

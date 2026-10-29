@@ -73,7 +73,7 @@ fn e0106_dimension_mismatch() {
 #[test]
 fn unknown_target() {
     let ir = r#"{"dt_ms":1.0,"layers":[{"type":"lif","tau_mem":10.0,"tau_syn":null,"threshold":1.0,"reset":"subtract"}]}"#;
-    let err = compile(ir, "loihi").unwrap_err();
+    let err = compile(ir, "other").unwrap_err();
     assert_snapshot!("unknown_target", err.to_string());
 }
 
@@ -100,6 +100,20 @@ fn compile_dense_lif_succeeds() {
     assert_eq!(artifact["format_version"], "m2-draft");
     assert_eq!(artifact["target"], "sim");
     assert_eq!(artifact["metadata"]["dt_ms"], 1.0);
+    assert_eq!(artifact["model"]["resource_report"]["input_shape"], 2);
+    assert_eq!(artifact["model"]["resource_report"]["output_shape"], 2);
+    assert_eq!(
+        artifact["model"]["resource_report"]["total_weight_count"],
+        4
+    );
+    assert_eq!(artifact["model"]["resource_report"]["lif_neuron_count"], 2);
+    assert!(
+        artifact["metadata"]["capability_hash"]
+            .as_str()
+            .unwrap()
+            .len()
+            == 64
+    );
 
     // alpha = exp(-1.0 / 10.0) ≈ 0.9048374.
     let alpha = artifact["model"]["layers"][1]["alpha"].as_f64().unwrap();
@@ -107,4 +121,46 @@ fn compile_dense_lif_succeeds() {
         (alpha - (-0.1f64).exp()).abs() < 1e-6,
         "alpha should be exp(-dt/tau_mem)"
     );
+}
+
+#[test]
+fn compile_dense_only_succeeds() {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
+    // Dense(4→2): row-major [out × in] = [[1,0,0,0],[0,1,0,0]] so all-ones input
+    // produces a non-zero activation (needed for Console liveness without LIF).
+    let mut raw = Vec::with_capacity(8 * 4);
+    for v in [1.0f32, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0] {
+        raw.extend_from_slice(&v.to_le_bytes());
+    }
+    let weights = B64.encode(&raw);
+    let ir = format!(
+        r#"{{
+          "dt_ms": 1.0,
+          "layers": [
+            {{"type":"dense","in_features":4,"out_features":2,"weights_b64":"{weights}","bias_b64":null,"delays":null}}
+          ]
+        }}"#
+    );
+    let report = compile(&ir, "sim").expect("dense-only compile should succeed");
+    assert!(report.advisory.is_none());
+    let artifact: serde_json::Value = serde_json::from_str(&report.thx_json).unwrap();
+    assert_eq!(artifact["format_version"], "m2-draft");
+    assert_eq!(artifact["target"], "sim");
+    assert_eq!(artifact["model"]["resource_report"]["input_shape"], 4);
+    assert_eq!(artifact["model"]["resource_report"]["output_shape"], 2);
+    assert_eq!(
+        artifact["model"]["resource_report"]["total_weight_count"],
+        8
+    );
+    assert_eq!(artifact["model"]["resource_report"]["lif_neuron_count"], 0);
+    let layers = artifact["model"]["layers"].as_array().unwrap();
+    assert_eq!(layers.len(), 1);
+    assert_eq!(layers[0]["type"], "dense");
+    assert!(
+        layers.iter().all(|l| l["type"] != "lif"),
+        "dense-only artifact must not contain LIF"
+    );
+    if let Ok(path) = std::env::var("WRITE_DENSE_FEEDFORWARD_THX") {
+        std::fs::write(&path, &report.thx_json).expect("write dense-feedforward fixture");
+    }
 }

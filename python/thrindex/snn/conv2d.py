@@ -37,8 +37,13 @@ class Conv2d(nn.Module):
         dilation: int | tuple[int, int] = 1,
         groups: int = 1,
         bias: bool = True,
+        input_height: int | None = None,
+        input_width: int | None = None,
     ) -> None:
         super().__init__()
+        # The chip program needs the image size. torch.nn.Conv2d does not store it.
+        self.input_height = input_height
+        self.input_width = input_width
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,

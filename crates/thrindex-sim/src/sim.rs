@@ -15,6 +15,7 @@ use crate::error::SimError;
 use crate::lif::{LifState, step as lif_step};
 use crate::model::{DenseLayer, ResolvedLayer, ResolvedModel};
 use crate::raster::SpikeRaster;
+use crate::spatial::{self, Activation};
 
 /// Configuration for a simulation run.
 #[derive(Debug, Clone, Default)]
@@ -99,7 +100,7 @@ pub fn run(
     let results: Vec<Result<SampleResult, SimError>> = pool.install(|| {
         inputs
             .par_iter()
-            .map(|sample| Ok(run_one_sample(model, sample)))
+            .map(|sample| run_one_sample(model, sample))
             .collect()
     });
 
@@ -123,51 +124,63 @@ pub fn run(
 // ── Per-sample execution ──────────────────────────────────────────────────────
 
 /// Run one input sample through the full model, one timestep at a time.
-fn run_one_sample(model: &ResolvedModel, input: &[Vec<f32>]) -> SampleResult {
+fn run_one_sample(model: &ResolvedModel, input: &[Vec<f32>]) -> Result<SampleResult, SimError> {
     let t_steps = input.len();
     if t_steps == 0 {
-        return (vec![], SimStats::default());
+        return Ok((vec![], SimStats::default()));
     }
 
     // Allocate LIF states lazily (first timestep determines neuron count).
     let mut lif_states: Vec<Option<LifState>> = vec![None; model.layers.len()];
+    let mut delay_lines: Vec<Option<DelayLine>> = vec![None; model.layers.len()];
     let mut output_frames: Vec<Vec<f32>> = Vec::with_capacity(t_steps);
     let mut sample_stats = SimStats::default();
 
     for frame in input {
-        let mut h: Vec<f32> = frame.clone();
+        let mut act = Activation::flat(frame.clone());
 
         for (i, layer) in model.layers.iter().enumerate() {
             match layer {
                 ResolvedLayer::Dense(d) => {
-                    let (out, ops) = dense_forward(&h, d);
+                    let features = act.as_features(i)?.to_vec();
+                    let (out, ops) = if let Some(delays) = &d.delays {
+                        let line = delay_lines[i].get_or_insert_with(|| {
+                            DelayLine::new(delays.iter().copied().max().unwrap_or(0))
+                        });
+                        dense_delayed(&features, d, delays, line)
+                    } else {
+                        dense_forward(&features, d)
+                    };
                     sample_stats.synaptic_ops += ops;
-                    h = out;
+                    act = Activation::flat(out);
                 }
-                ResolvedLayer::Conv2d(_c) => {
-                    // Conv2d execution deferred to M3 (reshape semantics for spike frames).
-                    // A proper implementation requires shape tracking across timesteps.
+                ResolvedLayer::Conv2d(conv) => {
+                    let (out, ops) = spatial::conv2d(&act, conv, i)?;
+                    sample_stats.synaptic_ops += ops;
+                    act = out;
                 }
-                ResolvedLayer::Flatten(_) => {
-                    // Flatten is a no-op in the current 1-D simulation model.
-                    // Full spatial shape propagation is deferred alongside Conv2d (M3).
+                ResolvedLayer::Flatten(flat) => {
+                    act = spatial::flatten(&act, flat, i)?;
                 }
                 ResolvedLayer::Lif(lif) => {
                     if lif_states[i].is_none() {
-                        lif_states[i] = Some(LifState::zeros(h.len(), lif.alpha_syn.is_some()));
+                        lif_states[i] = Some(LifState::zeros(act.values.len(), lif.alpha_syn.is_some()));
                     }
                     let lif_state = lif_states[i].as_mut().expect("just initialised");
-                    h = lif_step(&h, lif_state, lif);
-                    let spk_count = h.iter().filter(|&&v| v > 0.5).count() as u64;
+                    let spikes = lif_step(&act.values, lif_state, lif);
+                    let spk_count = spikes.iter().filter(|&&v| v > 0.5).count() as u64;
                     sample_stats.total_spikes += spk_count;
+                    act.values = spikes;
                 }
             }
         }
 
-        output_frames.push(h);
+        // Spatial output is already stored channel-height-width, width fastest,
+        // which is the vector a later dense layer or the returned raster reads.
+        output_frames.push(act.values);
     }
 
-    (output_frames, sample_stats)
+    Ok((output_frames, sample_stats))
 }
 
 // ── Layer kernels ─────────────────────────────────────────────────────────────
@@ -197,6 +210,76 @@ fn dense_forward(x: &[f32], layer: &DenseLayer) -> (Vec<f32>, u64) {
     (out, ops)
 }
 
+/// Inputs seen by one dense layer, so a connection can read `d` steps back.
+#[derive(Clone)]
+struct DelayLine {
+    cap: usize,
+    slots: Vec<Vec<f32>>,
+    next: usize,
+    /// Timesteps stored so far, including the one just written.
+    seen: u64,
+}
+
+impl DelayLine {
+    fn new(max_delay: u16) -> Self {
+        let cap = usize::from(max_delay) + 1;
+        Self {
+            cap,
+            slots: Vec::with_capacity(cap),
+            next: 0,
+            seen: 0,
+        }
+    }
+
+    fn read(&self, delay: u16, feature: usize) -> f32 {
+        let delay = u64::from(delay);
+        if delay >= self.seen {
+            return 0.0;
+        }
+        let slot = (self.seen - 1 - delay) % self.cap as u64;
+        self.slots[usize::try_from(slot).unwrap_or(0)][feature]
+    }
+}
+
+/// Dense forward where connection `(out, inp)` reads the input from `delays` steps ago.
+///
+/// Delay 0 is the current frame. A delay longer than the steps seen so far reads 0.
+fn dense_delayed(
+    x: &[f32],
+    layer: &DenseLayer,
+    delays: &[u16],
+    line: &mut DelayLine,
+) -> (Vec<f32>, u64) {
+    if line.slots.len() < line.cap {
+        line.slots.push(x.to_vec());
+    } else {
+        line.slots[line.next] = x.to_vec();
+    }
+    line.seen += 1;
+    let m = layer.out_features;
+    let n = layer.in_features;
+    let mut out = match &layer.bias {
+        Some(b) => b.clone(),
+        None => vec![0.0_f32; m],
+    };
+    let mut ops = 0_u64;
+    for i in 0..m {
+        let mut acc = out[i];
+        let w_row = &layer.weights[i * n..(i + 1) * n];
+        let d_row = &delays[i * n..(i + 1) * n];
+        for (j, (&weight, &delay)) in w_row.iter().zip(d_row.iter()).enumerate() {
+            let sample = line.read(delay, j);
+            acc += weight * sample;
+            if sample > 0.5 {
+                ops += 1;
+            }
+        }
+        out[i] = acc;
+    }
+    line.next = (line.next + 1) % line.cap;
+    (out, ops)
+}
+
 /// Build a Rayon thread pool for the requested concurrency.
 fn build_pool(threads: usize) -> rayon::ThreadPool {
     let n = if threads == 0 {
@@ -215,7 +298,12 @@ fn first_input_dim(model: &ResolvedModel) -> Option<usize> {
     for layer in &model.layers {
         match layer {
             ResolvedLayer::Dense(d) => return Some(d.in_features),
-            ResolvedLayer::Conv2d(c) => return Some(c.in_channels),
+            ResolvedLayer::Conv2d(c) => {
+                return match (c.input_height, c.input_width) {
+                    (Some(h), Some(w)) => Some(c.in_channels * h * w),
+                    _ => None,
+                };
+            }
             ResolvedLayer::Lif(_) | ResolvedLayer::Flatten(_) => {}
         }
     }
@@ -334,6 +422,7 @@ mod tests {
                         1.0,
                     ],
                     bias: None,
+                    delays: None,
                 }),
                 ResolvedLayer::Lif(LifLayer {
                     threshold: 1.0,
@@ -343,6 +432,24 @@ mod tests {
                 }),
             ],
         }
+    }
+
+    #[test]
+    fn dense_delay_of_one_shifts_the_input() {
+        use crate::model::{DenseLayer, ResolvedLayer};
+        let model = ResolvedModel {
+            target: "sim".into(),
+            layers: vec![ResolvedLayer::Dense(DenseLayer {
+                in_features: 1,
+                out_features: 1,
+                weights: vec![1.0],
+                bias: None,
+                delays: Some(vec![1]),
+            })],
+        };
+        let sample = vec![vec![1.0], vec![0.0], vec![0.0]];
+        let out = run(&model, &[sample], &SimConfig { threads: 1 }).unwrap();
+        assert_eq!(out.spikes[0], vec![vec![0.0], vec![1.0], vec![0.0]]);
     }
 
     fn spike_input(t: usize, n: usize, value: f32) -> Vec<Vec<f32>> {

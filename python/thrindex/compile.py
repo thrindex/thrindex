@@ -126,14 +126,17 @@ def _serialise_layer_ir(layer: nn.Module) -> dict[str, Any]:
 def _serialise_dense_ir(layer: ThxDense) -> dict[str, Any]:
     w = layer.linear.weight.detach().cpu()
     b: Tensor | None = layer.linear.bias  # type: ignore[assignment]
-    return {
+    out_features = int(w.shape[0])
+    in_features = int(w.shape[1])
+    body: dict[str, Any] = {
         "type": "dense",
-        "in_features": w.shape[1],
-        "out_features": w.shape[0],
+        "in_features": in_features,
+        "out_features": out_features,
         "weights_b64": _to_b64(w),
         "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
-        "delays": None,
+        "delays": _dense_delays(layer.delay, in_features, out_features),
     }
+    return body
 
 
 def _serialise_lif_ir(layer: LIF) -> dict[str, Any]:
@@ -152,18 +155,22 @@ def _serialise_conv2d_ir(layer: ThxConv2d) -> dict[str, Any]:
     conv = layer.conv
     w = conv.weight.detach().cpu()
     b: Tensor | None = conv.bias  # type: ignore[assignment]
-    out_c, in_c, kh, kw = w.shape
-    # Conv2d carries no delays (ADR-0009 v1 scope — deferred).
+    _out_c, _in_per_group, kh, kw = (int(v) for v in w.shape)
+    # Weight axis 1 is in_channels/groups. The layer's in_channels is the full count.
     return {
         "type": "conv2d",
-        "in_channels": in_c,
-        "out_channels": out_c,
+        "in_channels": int(conv.in_channels),
+        "out_channels": int(conv.out_channels),
         "kernel_h": kh,
         "kernel_w": kw,
         "stride": list(conv.stride),
         "padding": list(conv.padding),
         "weights_b64": _to_b64(w),
         "bias_b64": _to_b64(b.detach().cpu()) if b is not None else None,  # pyright: ignore[reportUnnecessaryComparison]
+        "groups": int(conv.groups),
+        "dilation": [int(conv.dilation[0]), int(conv.dilation[1])],
+        "input_height": layer.input_height,
+        "input_width": layer.input_width,
     }
 
 
@@ -200,6 +207,23 @@ def _compile_via_rust(ir_json: str, target: str) -> tuple[str, str | None]:
 
 
 # ── Encoding helpers ───────────────────────────────────────────────────────────
+
+
+def _dense_delays(delay: int, in_features: int, out_features: int) -> dict[str, str] | None:
+    """Per-connection delays in the Graph IR shape the compiler already lowers.
+
+    Delay 0 is omitted, so a zero-delay artifact stays byte-compatible with
+    older readers. A positive delay is one ``u16`` per connection, row-major
+    ``[out_features, in_features]``, the same order as the weights.
+    """
+    if delay == 0:
+        return None
+    count = in_features * out_features
+    raw = struct.pack(f"<{count}H", *([delay] * count))
+    return {
+        "encoding": "dense",
+        "delays_b64": base64.b64encode(raw).decode("ascii"),
+    }
 
 
 def _to_b64(t: Tensor) -> str:

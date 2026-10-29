@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://thrindex.com">
-  <img src="https://raw.githubusercontent.com/thrindex/thrindex/main/docs/assets/banner.png" width="800px" alt="Thrindex — The open compiler for spiking neuromorphic compute"/>
+  <img src="https://raw.githubusercontent.com/thrindex/thrindex/main/docs/assets/banner.png" width="800px" alt="Thrindex — The open neuromorphic compute engine"/>
 </a>
 
 <br/>
@@ -28,9 +28,9 @@ Author spiking neural networks in Python. Compile them to neuromorphic hardware.
 
 ## What is it?
 
-thrindex is the full-stack toolkit for spiking neural networks (SNNs) — from model authoring to deployment on neuromorphic hardware.
+thrindex is the toolkit for spiking neural networks (SNNs). You author a model, train it, compile it to a `.thx` file, and run that file on the behavioral simulator.
 
-It gives you a **PyTorch-native authoring API** for building and training SNNs with surrogate gradients, a **deterministic Rust simulation engine** for fast, reproducible model validation, and a **compiler + runtime** that targets real neuromorphic chips — all through one unified SDK.
+It gives you a **PyTorch-native authoring API** for building and training SNNs with surrogate gradients, a **deterministic Rust simulation engine** for fast, reproducible model validation, and a **compiler** that seals the trained model into a `.thx` file.
 
 ```python
 import thrindex as thx
@@ -97,12 +97,14 @@ optimizer.step()
 
 | Feature | Detail |
 |---|---|
-| **SNN layers** | `LIF`, `Sequential`, `Dense`, `Conv2d` — all `nn.Module` subclasses |
+| **SNN layers** | `LIF`, `Sequential`, `Dense`, `Conv2d`, `Flatten`. `Dense(delay=k)` holds the input `k` steps. The first `Conv2d` takes `input_height` and `input_width`. |
 | **Surrogate gradients** | Fast-sigmoid, analytically verified backward pass |
 | **Spike encoders** | Rate (Bernoulli), latency (time-to-first-spike), delta (change coding) |
 | **Deterministic numerics** | Parameterizable fixed-point `Q<INT, FRAC>` types; round-half-even; bit-identical across platforms |
 | **Typed errors** | Stable `E####` error codes — every error tells you what happened, why, and how to fix it |
-| **Hardware target** | Compile `.thx` artifacts and deploy to neuromorphic silicon (M2+) |
+| **Sealed artifact** | `thx.compile` writes a `.thx` file. The simulator runs dense, convolution, flatten, LIF, and dense delays. |
+| **Traces** | `model.forward_recorded(x)` returns the same spikes plus per-layer rasters and the pre-reset membrane |
+| **Datasets** | `thrindex.datasets`: SHD, N-MNIST, DVS Gesture, CIFAR10-DVS. Install with `pip install "thrindex[datasets]"` |
 
 ---
 
@@ -118,7 +120,7 @@ The `LIF` module follows the exact per-timestep update order:
 
 where `α = exp(−dt / τ_mem)` (exact exponential discretization, `dt = 1 ms`).
 
-Canonical parameters: `threshold`, `tau_mem`, `tau_syn`, `reset`, `delay`.
+Canonical LIF parameters: `threshold`, `tau_mem`, `tau_syn`, `reset`. Synaptic delay is `snn.Dense(..., delay=k)`, not a LIF argument.
 
 ---
 
@@ -156,7 +158,7 @@ Rust engines are MIT/Apache-2.0. The Python SDK wraps them with no logic of its 
 
 ## Status
 
-M5 complete — templates, public docs, CI snippet tests, conformance suite, and energy benchmark harness are all shipped. M6 (first silicon bring-up) is next.
+Templates, public docs, CI snippet tests, the conformance suite, and the energy benchmark harness are shipped. The SDK authors, compiles, and simulates.
 
 Issues and discussions are open.  
 See [SECURITY.md](SECURITY.md) for responsible disclosure.

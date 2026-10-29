@@ -8,6 +8,10 @@ license = "Apache-2.0"
 [dependencies]
 # Justification (§12): Graph IR types (ADR-0008, ADR-0009).
 thrindex-ir = { path = "../thrindex-ir", version = "0.3.0" }
+# Justification (§12): one geometry walk and one capability hash, shared with the
+# parser. A stored resource_report that disagrees with the layers is rejected
+# there, so the compiler must not keep a second copy of either algorithm.
+thrindex-artifact = { path = "../thrindex-artifact", version = "0.1.0" }
 # Justification (§12): typed errors, no boilerplate.
 thiserror = "2"
 # Justification (§12): JSON serialization of Graph IR input and .thx artifact output.

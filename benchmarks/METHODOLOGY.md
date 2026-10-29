@@ -22,14 +22,13 @@ E_snn = syn_ops × coeff_pJ_per_syn_op
 - `coeff_pJ_per_syn_op` = **0.5 pJ/syn-op** (default).
 
 **Provenance of 0.5 pJ/syn-op:**
-This figure is consistent with published results from digital neuromorphic chips fabricated in advanced CMOS nodes:
+The figure sits in the range reported by published digital designs:
 - Loihi 2 (Intel, Intel 4 process): 0.5–10 pJ/syn-op depending on workload
 - TrueNorth (IBM, 28nm): ~26 pJ/syn-op at the chip level (higher due to older node)
 - Academic TSMC 7nm designs: ~0.3–1.0 pJ/syn-op reported
 
-0.5 pJ is a representative figure for a modern 7nm digital implementation.
-It is not calibrated to any shipping chip. Use `thrindex run model.thx --energy-coeff X`
-to apply a device-specific value.
+0.5 pJ is a representative published figure. It is not a measurement this
+repository made, and `thrindex run` does not take a coefficient flag.
 
 ### MLP energy
 
@@ -76,11 +75,7 @@ for t in range(T):
 
 ## Latency note
 
-The SNN simulator wall time measures **thrindex-sim on CPU** — a software tool for development and conformance validation, not the deployment target. Neuromorphic silicon (M6 milestone) achieves orders-of-magnitude lower latency than CPU simulation.
-
-The MLP wall time is measured on the same CPU for a consistent baseline, but a production GPU deployment would be faster. Both latency figures should be read as "CPU software comparison" only.
-
-**No latency claim about neuromorphic hardware is made here.**
+The SNN wall time is **thrindex-sim on CPU**. The MLP wall time is the same CPU. Both numbers are a software comparison.
 
 ---
 

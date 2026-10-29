@@ -9,8 +9,8 @@ Dataset: Neuromorphic-MNIST (N-MNIST)
 Architecture
 ------------
 Input: N-MNIST frames binned to T=20 timesteps, 2 polarities × 34×34 pixels.
-Spatial dimensions are flattened before the SNN so all layers compile through
-thrindex's current compiler (Dense + LIF pass; Conv2d+Flatten deferred).
+This template flattens the frames and uses dense layers. A convolution can
+also be compiled and simulated; this script keeps the published dense baseline.
 
     Dense(2312, 1024) → LIF(τ_mem=20ms)
     Dense(1024,  256) → LIF(τ_mem=20ms)
@@ -94,49 +94,15 @@ def _load_nmnist(
     labels : Tensor
         Shape [N] — integer class in [0, 9].
     """
-    import tonic
-    import tonic.transforms as transforms
+    from thrindex.datasets import load_nmnist
 
-    train = split == "train"
-    sensor_size = tonic.datasets.NMNIST.sensor_size  # (34, 34, 2)
-
-    frame_transform = transforms.ToFrame(
-        sensor_size=sensor_size,
-        n_time_bins=T,
-    )
-
-    dataset = tonic.datasets.NMNIST(
-        save_to=str(data_dir),
-        train=train,
-        transform=frame_transform,
-    )
-
-    print(f"  Loading {split} split ({len(dataset)} samples)…")
-    all_frames: list[torch.Tensor] = []
-    all_labels: list[int] = []
-
-    for idx in range(len(dataset)):
-        frames_np, label = dataset[idx]
-        # frames_np: numpy array [T, C, H, W] or [T, H, W, C] depending on tonic version
-        frames_t = torch.from_numpy(frames_np).float()
-        # Normalise to [0, 1] in case counts > 1 (multiple events per bin)
-        frames_t = frames_t.clamp(0.0, 1.0)
-        # Ensure [T, C, H, W] — tonic ≥ 0.6 returns [T, C, H, W]
-        if frames_t.shape[0] != T:
-            # Older tonic may return [C, T, H, W] — permute if needed
-            if frames_t.shape[1] == T:
-                frames_t = frames_t.permute(1, 0, 2, 3)
-        # Flatten spatial: [T, C*H*W]
-        frames_t = frames_t.reshape(T, N_IN)
-        all_frames.append(frames_t)
-        all_labels.append(int(label))
-
-        if (idx + 1) % 10_000 == 0:
-            print(f"    {idx + 1}/{len(dataset)}", flush=True)
-
-    data = torch.stack(all_frames, dim=0)    # [N, T, N_IN]
-    labels = torch.tensor(all_labels, dtype=torch.long)
-    return data, labels
+    try:
+        loaded = load_nmnist(data_dir, split, timesteps=T)
+    except ImportError as exc:
+        sys.exit(str(exc))
+    frames = loaded.spikes.reshape(loaded.spikes.shape[0], loaded.spikes.shape[1], -1)
+    print(f"  Loading {split} split ({frames.shape[0]} samples)…")
+    return frames, loaded.labels
 
 
 # ── Model ──────────────────────────────────────────────────────────────────────

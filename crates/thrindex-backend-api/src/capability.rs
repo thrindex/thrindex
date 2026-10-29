@@ -10,9 +10,8 @@
 //!   - whether to lower delays natively or emulate (ADR-0009 policy P3),
 //!   - which quantization path to take (future RFC-004).
 //!
-//! UNVERIFIED hardware figures (e.g. Loihi 2's 62/63 step cap, SpiNNaker's 16-slot ring)
-//! must be declared in each backend's `Capability::default()`, not here. No number in
-//! this file should ever be chip-specific.
+//! Numbers that belong to one backend stay in that backend. This file holds the shape
+//! of the descriptor, not a chip's limits.
 use serde::{Deserialize, Serialize};
 
 /// What a backend can do. Declared by each backend; read by the compiler and harness.
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// All timing constants are owned here — never in core crates (ADR-0008 §4).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capability {
-    /// Short identifier, e.g. `"sim"`, `"loihi2"`, `"spinnaker"`.
+    /// Short identifier. The simulator uses `"sim"`.
     pub name: String,
 
     /// Native algorithmic timestep in milliseconds (ADR-0008).

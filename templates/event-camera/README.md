@@ -113,10 +113,10 @@ thrindex run model.thx --seed 0
 ## Encoder note
 
 N-MNIST events arrive pre-encoded as sparse ON/OFF spikes — no additional encoder
-is applied.  The `ToFrame` transform from `tonic` bins the event stream into
-discrete timesteps and the spatial tensor is flattened before feeding the SNN.
-Conv2d spatial feature extraction (Dense → Conv2d → LIF chains) is deferred to
-a future template once the compiler's flatten lower-pass is complete.
+is applied.  `thrindex.datasets.load_nmnist` bins the stream with tonic and
+returns `[N, T, C, H, W]`. This template flattens that tensor and trains dense
+layers. A `snn.Conv2d` with `input_height` and `input_width` compiles and simulates
+as well. This script keeps the dense baseline.
 
 ## Energy estimate
 

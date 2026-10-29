@@ -5,8 +5,7 @@
 //! This crate is **L1** in the layer law (ARCHITECTURE.md):
 //! - Depends on: nothing beyond `std` and `serde`.
 //! - Depended on by: `thrindex-sim` (L2, implements [`Backend`] as the reference),
-//!   `conformance/` (the harness), and future hardware backend crates under
-//!   `crates/thrindex-backends/<target>/`.
+//!   and `conformance/` (the harness).
 //!
 //! ## What lives here
 //!

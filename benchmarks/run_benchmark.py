@@ -26,7 +26,7 @@ What is measured
 Energy model
 ------------
 SNN:  E = syn_ops × coeff_pJ_per_syn_op
-      Default coeff = 0.5 pJ/syn-op (consistent with published 7nm neuromorphic silicon).
+      Default coeff = 0.5 pJ/syn-op (a published literature estimate, not a measurement).
 
 MLP:  E = MACs × coeff_pJ_per_MAC
       Two reference points (both modeled, not measured):
@@ -35,10 +35,7 @@ MLP:  E = MACs × coeff_pJ_per_MAC
 
 Latency note
 ------------
-The simulator is a SOFTWARE tool for development and validation — it is not the
-deployment target. SNN wall time here reflects the CPU Python simulator, not
-neuromorphic silicon. A hardware comparison requires the M6 silicon bring-up.
-MLP wall time is measured on the same CPU for consistency.
+SNN wall time is the CPU simulator. MLP wall time is the same CPU.
 
 Usage
 -----
@@ -277,9 +274,9 @@ def _print_report(snn: list[dict], mlp_rate: list[dict], mlp_temp: list[dict]) -
     print(f"  Avg synaptic ops:   {snn_syn_ops:>14,.0f}")
     print(f"  Avg firing rate:    {snn_fire:>13.1%}")
     print(f"  Modeled energy:     {snn_energy:>13.1f} nJ  "
-          f"({SNN_COEFF_PJ} pJ/syn-op — neuromorphic 7nm reference)")
+          f"({SNN_COEFF_PJ} pJ/syn-op — literature estimate)")
     print(f"  Sim wall time:      {snn_wall:>13.2f} ms  "
-          f"(CPU simulator — NOT the deployment target)")
+          f"(CPU simulator)")
 
     print(f"\n{'Baseline A — Rate-collapsed MLP (same params, 1 frame, loses temporal info)':}")
     print(f"  MACs:               {mlp_rate[0]['macs']:>14,}")
@@ -341,7 +338,7 @@ def _build_results(
             "snn_pj_per_syn_op": SNN_COEFF_PJ,
             "mlp_gpu_pj_per_mac": GPU_COEFF_PJ,
             "mlp_cpu_pj_per_mac": CPU_COEFF_PJ,
-            "snn_reference": "7nm neuromorphic silicon (consistent with published figures)",
+            "snn_reference": "published literature estimate, not a device measurement",
             "gpu_reference": "NVIDIA A100 — 400W TDP / (2 × 156 TMAC/s) ≈ 2.56 pJ/MAC",
             "cpu_reference": "ARM Cortex class CPU — 1.0 pJ/MAC (conservative 7nm estimate)",
         },

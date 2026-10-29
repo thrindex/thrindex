@@ -31,6 +31,7 @@ pub mod model;
 pub mod raster;
 pub mod sim;
 pub mod sim_backend;
+pub(crate) mod spatial;
 
 pub use error::SimError;
 pub use sim::{SimConfig, SimOutput, SimStats, render_transcript};

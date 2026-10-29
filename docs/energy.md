@@ -21,11 +21,9 @@ The product `pre_spikes × fan_out` is the number of **synaptic operations** (mu
 
 ## Default coefficient
 
-The default of **0.5 pJ/syn-op** is a round figure consistent with published
-neuromorphic silicon figures from multiple implementations.  It is not calibrated to
-any specific device.
-
-To override: `thrindex run model.thx --energy-coeff 1.2` (units: pJ/syn-op).
+The default of **0.5 pJ/syn-op** is a round figure taken from published
+papers. It is not a measurement from a device, and this SDK does not
+change it from the command line.
 
 ## Example calculation
 

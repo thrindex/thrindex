@@ -262,6 +262,8 @@ fn fixture_m3_with_dt_ms_round_trip() {
     let artifact = parse_bytes(&bytes).expect("parse m3_with_dt_ms");
     assert_eq!(artifact.format_version(), "m2-draft");
     assert_eq!(artifact.dt_ms(), Some(1.0), "m3 fixture has dt_ms = 1.0");
+    assert!(!artifact.has_resource_report(), "older files omit the geometry record");
+    assert_eq!(artifact.capability_hash(), None);
 
     let reserialized = artifact.to_json();
     let artifact2 =

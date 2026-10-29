@@ -1,0 +1,39 @@
+{
+  "format_version": "m2-draft",
+  "thrindex_version": "0.3.0",
+  "target": "sim",
+  "model": {
+    "layers": [
+      {
+        "bias_b64": null,
+        "dilation": [
+          1,
+          1
+        ],
+        "groups": 1,
+        "in_channels": 1,
+        "input_height": 5,
+        "input_width": 5,
+        "kernel_h": 3,
+        "kernel_w": 3,
+        "out_channels": 1,
+        "padding": [
+          1,
+          1
+        ],
+        "stride": [
+          1,
+          1
+        ],
+        "type": "conv2d",
+        "weights_b64": "AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAA"
+      }
+    ]
+  },
+  "metadata": {
+    "compiled_at": "2026-10-11T14:00:00Z",
+    "model_canonical": "{\"layers\":[{\"bias_b64\":null,\"dilation\":[1,1],\"groups\":1,\"in_channels\":1,\"input_height\":5,\"input_width\":5,\"kernel_h\":3,\"kernel_w\":3,\"out_channels\":1,\"padding\":[1,1],\"stride\":[1,1],\"type\":\"conv2d\",\"weights_b64\":\"AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAA\"}]}",
+    "crc32": "43e93b81",
+    "dt_ms": 1.0
+  }
+}

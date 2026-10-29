@@ -208,6 +208,7 @@ where
                     weights: quantize_weights(&d.weights, d.out_features),
                     // Biases are left in f32 — most hardware backends do not quantize biases.
                     bias: d.bias.clone(),
+                    delays: d.delays.clone(),
                 })
             }
             other => other.clone(),

@@ -74,6 +74,16 @@ pub struct Conv2dLayer {
     pub weights_b64: String,
     /// Base64 of little-endian f32 biases `[out_channels]`, or `None`.
     pub bias_b64: Option<String>,
+    /// Image height, when the author passed it to `snn.Conv2d`.
+    #[serde(default)]
+    pub input_height: Option<usize>,
+    /// Image width, when the author passed it to `snn.Conv2d`.
+    #[serde(default)]
+    pub input_width: Option<usize>,
+    #[serde(default)]
+    pub groups: Option<usize>,
+    #[serde(default)]
+    pub dilation: Option<Vec<usize>>,
 }
 
 /// Spatial-to-feature flatten (no learned parameters).

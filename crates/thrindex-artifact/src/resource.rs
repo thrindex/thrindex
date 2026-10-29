@@ -1,12 +1,16 @@
 //! Resource summary — derived from model layer shapes.
 //!
-//! The `m2-draft` format does not store a resource declaration, so the
-//! Platform derives resource figures from the layer geometry.  These are
-//! **estimates** sufficient for WS-1 verification checks.  A full resource
-//! declaration requires the `m2-platform` format bump (see `lib.rs`).
+//! Older `.thx` files omit `resource_report`. The summary is then derived
+//! from the layers. A file that includes `resource_report` must match this
+//! derivation; see [`check_report`].
 
-/// Derived resource figures for Platform verification check #3.
-#[derive(Debug, Clone)]
+use crate::error::ArtifactError;
+
+/// Geometry of a model, either derived from its layers or declared by the compiler.
+///
+/// Field order is the on-disk order inside `model.resource_report`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResourceSummary {
     /// Total number of layers.
     pub layer_count: usize,
@@ -28,11 +32,100 @@ pub struct ResourceSummary {
     pub output_shape: Option<usize>,
 }
 
+/// Derive a [`ResourceSummary`] from the ordered slice of raw layer values.
+///
+/// This is the single geometry walk. The compiler stores the result, and
+/// parse checks a stored report against a fresh call.
+pub fn summarize_layers(layers: &[serde_json::Value]) -> ResourceSummary {
+    derive(layers)
+}
+
+/// Reject a stored report that disagrees with the layers.
+pub(crate) fn check_report(
+    declared: &ResourceSummary,
+    layers: &[serde_json::Value],
+) -> Result<(), ArtifactError> {
+    let derived = derive(layers);
+    if declared == &derived {
+        return Ok(());
+    }
+    Err(ArtifactError::InvalidContent {
+        detail: format!(
+            "resource_report does not match the layers ({})",
+            report_diff(declared, &derived)
+        ),
+    })
+}
+
+fn report_diff(declared: &ResourceSummary, derived: &ResourceSummary) -> String {
+    let mut parts = Vec::new();
+    push_diff(
+        &mut parts,
+        "input_shape",
+        &declared.input_shape,
+        &derived.input_shape,
+    );
+    push_diff(
+        &mut parts,
+        "output_shape",
+        &declared.output_shape,
+        &derived.output_shape,
+    );
+    push_diff(
+        &mut parts,
+        "layer_count",
+        &declared.layer_count,
+        &derived.layer_count,
+    );
+    push_diff(
+        &mut parts,
+        "lif_neuron_count",
+        &declared.lif_neuron_count,
+        &derived.lif_neuron_count,
+    );
+    push_diff(
+        &mut parts,
+        "total_weight_count",
+        &declared.total_weight_count,
+        &derived.total_weight_count,
+    );
+    push_diff(
+        &mut parts,
+        "has_delays",
+        &declared.has_delays,
+        &derived.has_delays,
+    );
+    push_diff(
+        &mut parts,
+        "layer_types",
+        &declared.layer_types,
+        &derived.layer_types,
+    );
+    if parts.is_empty() {
+        "declared report differs".to_string()
+    } else {
+        parts.join("; ")
+    }
+}
+
+fn push_diff<T: std::fmt::Debug + PartialEq>(
+    parts: &mut Vec<String>,
+    name: &str,
+    declared: &T,
+    derived: &T,
+) {
+    if declared != derived {
+        parts.push(format!(
+            "{name} is {declared:?} but the layers describe {derived:?}"
+        ));
+    }
+}
+
 /// Derive a [`ResourceSummary`] from the ordered slice of raw layer `Value`s.
 ///
 /// Unknown layer types are counted but do not contribute to weight / neuron
 /// totals; `layer_types` will contain their `"type"` string (or `"unknown"`).
-pub(crate) fn derive(layers: &[serde_json::Value]) -> ResourceSummary {
+fn derive(layers: &[serde_json::Value]) -> ResourceSummary {
     let mut lif_neuron_count = 0usize;
     let mut total_weight_count = 0usize;
     let mut has_delays = false;

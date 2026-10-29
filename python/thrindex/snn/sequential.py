@@ -12,14 +12,30 @@ State is initialized to zeros lazily on the first timestep of each forward call
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
+from thrindex.snn.dense import Dense
 from thrindex.snn.lif import LIF, LIFState
 
-__all__ = ["Sequential"]
+__all__ = ["RecordedForward", "Sequential"]
+
+
+@dataclass
+class RecordedForward:
+    """Output of :meth:`Sequential.forward_recorded`.
+
+    ``output`` matches :meth:`Sequential.forward`. ``layer_spikes`` maps a layer
+    index to ``[T, batch, ...]``. ``membrane`` does the same for each recorded
+    LIF, and the value is the potential before reset.
+    """
+
+    output: Tensor
+    layer_spikes: dict[int, Tensor]
+    membrane: dict[int, Tensor]
 
 
 class Sequential(nn.Module):
@@ -78,19 +94,47 @@ class Sequential(nn.Module):
         Tensor
             Output of the last layer at each timestep, shape ``[T, batch, *]``.
         """
-        T = x.shape[0]
+        return self._unroll(x, record=False).output
 
-        # LIF state indexed by layer position.  Initialized lazily on t=0.
+    def forward_recorded(
+        self,
+        x: Tensor,
+        *,
+        layers: Sequence[int] | None = None,
+    ) -> RecordedForward:
+        """Same unroll as :meth:`forward`, plus the tensors a probe needs.
+
+        ``layers`` selects which layer indices are kept. ``None`` keeps every
+        layer. LIF entries in ``membrane`` are the potential compared with the
+        threshold, before reset. ``output`` is identical to :meth:`forward`.
+        """
+        chosen = None if layers is None else frozenset(layers)
+        return self._unroll(x, record=True, chosen=chosen)
+
+    def _unroll(
+        self,
+        x: Tensor,
+        *,
+        record: bool,
+        chosen: frozenset[int] | None = None,
+    ) -> RecordedForward:
+        time_steps = x.shape[0]
         lif_states: dict[int, LIFState] = {}
-
+        # Past inputs to each delayed Dense, oldest first, not including this step.
+        delay_hist: dict[int, list[Tensor]] = {}
         spikes_out: list[Tensor] = []
-        for t in range(T):
-            h: Tensor = x[t]
+        kept_spikes: dict[int, list[Tensor]] = {}
+        kept_mem: dict[int, list[Tensor]] = {}
+
+        def _keep(index: int) -> bool:
+            return record and (chosen is None or index in chosen)
+
+        for _t in range(time_steps):
+            h: Tensor = x[_t]
             for i, layer in enumerate(self._layers):
+                mem_t: Tensor | None = None
                 if isinstance(layer, LIF):
                     if i not in lif_states:
-                        # Lazy init: zero membrane with the same shape as the
-                        # current feature tensor (inferred from the layer before it).
                         lif_states[i] = LIFState(
                             mem=torch.zeros_like(h),
                             syn=(
@@ -99,14 +143,47 @@ class Sequential(nn.Module):
                                 else None
                             ),
                         )
-                    spk, lif_states[i] = layer(h, lif_states[i])
+                    spk, lif_states[i], mem_t = layer.step(h, lif_states[i])
                     h = spk
+                elif isinstance(layer, Dense) and layer.delay > 0:
+                    h = _delayed_dense(layer, h, delay_hist, i)
                 else:
                     h = layer(h)  # type: ignore[assignment]
+                if _keep(i):
+                    kept_spikes.setdefault(i, []).append(h)
+                    if mem_t is not None:
+                        kept_mem.setdefault(i, []).append(mem_t)
             spikes_out.append(h)
 
-        return torch.stack(spikes_out, dim=0)
+        return RecordedForward(
+            output=torch.stack(spikes_out, dim=0),
+            layer_spikes={i: torch.stack(frames, dim=0) for i, frames in kept_spikes.items()},
+            membrane={i: torch.stack(frames, dim=0) for i, frames in kept_mem.items()},
+        )
 
     def extra_repr(self) -> str:
         lines = [f"  ({i}): {layer}" for i, layer in enumerate(self._layers)]
         return "\n" + "\n".join(lines) + "\n"
+
+
+def _delayed_dense(
+    layer: Dense,
+    current: Tensor,
+    history: dict[int, list[Tensor]],
+    index: int,
+) -> Tensor:
+    """Apply ``layer`` to the input from ``layer.delay`` steps ago.
+
+    The current input is stored after the read, so delay 1 uses the previous
+    step and the first step sees zeros. The stored tensors stay in the
+    autograd graph.
+    """
+    past = history.setdefault(index, [])
+    if len(past) >= layer.delay:
+        delayed = past[-layer.delay]
+    else:
+        delayed = torch.zeros_like(current)
+    past.append(current)
+    if len(past) > layer.delay:
+        past.pop(0)
+    return layer(delayed)

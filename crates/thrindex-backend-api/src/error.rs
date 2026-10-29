@@ -29,7 +29,7 @@ pub enum BackendError {
 
     /// Backend-specific execution error.
     #[error(
-        "E0204: backend execution failed\nWhy: {detail}\nFix: check backend driver and hardware connection\nDocs: https://docs.thrindex.com/errors/E0204"
+        "E0204: backend execution failed\nWhy: {detail}\nFix: read the detail and correct the artifact or the input\nDocs: https://docs.thrindex.com/errors/E0204"
     )]
     Execution { detail: String },
 }

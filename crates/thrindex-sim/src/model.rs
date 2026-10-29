@@ -69,6 +69,12 @@ pub(crate) struct DenseRaw {
     pub out_features: usize,
     pub weights_b64: String,
     pub bias_b64: Option<String>,
+    /// Little-endian `u16` delays, present only when the connection is delayed.
+    #[serde(default)]
+    pub delays_b64: Option<String>,
+    /// `"dense"` or `"sparse"`. Absent on zero-delay layers.
+    #[serde(default)]
+    pub delays_encoding: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +97,16 @@ pub(crate) struct Conv2dRaw {
     pub padding: [usize; 2],
     pub weights_b64: String,
     pub bias_b64: Option<String>,
+    /// Image height of the first convolution. The simulator uses it to shape the frame.
+    #[serde(default)]
+    pub input_height: Option<usize>,
+    /// Image width of the first convolution.
+    #[serde(default)]
+    pub input_width: Option<usize>,
+    #[serde(default)]
+    pub groups: Option<usize>,
+    #[serde(default)]
+    pub dilation: Option<Vec<usize>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,6 +133,9 @@ pub struct DenseLayer {
     /// Row-major `[out_features × in_features]`.
     pub weights: Vec<f32>,
     pub bias: Option<Vec<f32>>,
+    /// Per-connection delay in timesteps, same layout as `weights`.
+    /// `None` means every connection has delay 0 and the fast matmul is used.
+    pub delays: Option<Vec<u16>>,
 }
 
 #[derive(Debug, Clone)]
@@ -143,15 +162,21 @@ pub struct Conv2dLayer {
     pub kernel_w: usize,
     pub stride: [usize; 2],
     pub padding: [usize; 2],
-    /// `[out_channels, in_channels, kernel_h, kernel_w]` row-major.
+    /// `torch.nn.Conv2d` groups. Weight tensor is `[out, in/groups, kH, kW]`.
+    pub groups: usize,
+    /// Dilation `[height, width]`.
+    pub dilation: [usize; 2],
+    /// Image size of this convolution when it is the first spatial layer.
+    /// Later convolutions take their size from the activation that reached them.
+    pub input_height: Option<usize>,
+    pub input_width: Option<usize>,
+    /// `[out_channels, in_channels/groups, kernel_h, kernel_w]` row-major.
     pub weights: Vec<f32>,
     pub bias: Option<Vec<f32>>,
 }
 
-/// Flatten layer: reshape spatial output to a 1-D feature vector.
-///
-/// The simulator currently treats this as a no-op because simulation operates on
-/// 1-D feature vectors throughout.  Full spatial shape propagation is deferred (M3).
+/// Flatten layer: reshape a spatial frame the way `torch.nn.Flatten` does
+/// on a batch of one.
 #[derive(Debug, Clone)]
 pub struct FlattenLayer {
     pub start_dim: i32,
@@ -281,20 +306,26 @@ fn resolve_model(artifact: &ThxArtifact) -> Result<ResolvedModel, SimError> {
     for (idx, raw) in artifact.model.layers.iter().enumerate() {
         let resolved = resolve_layer(raw, idx)?;
 
-        // Dimension continuity check (skip LIF — it does not change width).
-        let (in_dim, out_dim) = layer_dims(&resolved);
-        if let (Some(prev), Some(expected_in)) = (prev_out, in_dim)
-            && prev != expected_in
-        {
-            return Err(SimError::DimensionMismatch {
-                layer_idx: idx,
-                prev_idx: idx - 1,
-                expected: expected_in,
-                got: prev,
-            });
-        }
-        if let Some(o) = out_dim {
-            prev_out = Some(o);
+        // Dense-to-dense width is checked here. Convolution and flatten change
+        // rank, so their width is checked when the frame is executed.
+        match &resolved {
+            ResolvedLayer::Dense(dense) => {
+                if let Some(prev) = prev_out
+                    && prev != dense.in_features
+                {
+                    return Err(SimError::DimensionMismatch {
+                        layer_idx: idx,
+                        prev_idx: idx - 1,
+                        expected: dense.in_features,
+                        got: prev,
+                    });
+                }
+                prev_out = Some(dense.out_features);
+            }
+            ResolvedLayer::Conv2d(_) | ResolvedLayer::Flatten(_) => {
+                prev_out = None;
+            }
+            ResolvedLayer::Lif(_) => {}
         }
 
         layers.push(resolved);
@@ -331,11 +362,18 @@ fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, Sim
                 "weights",
             )?;
             let bias = decode_weights_opt(d.bias_b64.as_ref(), d.out_features, idx, "bias")?;
+            let delays = decode_delays(
+                d.delays_b64.as_deref(),
+                d.delays_encoding.as_deref(),
+                d.out_features * d.in_features,
+                idx,
+            )?;
             Ok(ResolvedLayer::Dense(DenseLayer {
                 in_features: d.in_features,
                 out_features: d.out_features,
                 weights,
                 bias,
+                delays,
             }))
         }
         "lif" => {
@@ -373,25 +411,7 @@ fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, Sim
                 reset,
             }))
         }
-        "conv2d" => {
-            let c: Conv2dRaw =
-                serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
-                    detail: format!("layer[{idx}] conv2d parse error: {e}"),
-                })?;
-            let n_weights = c.out_channels * c.in_channels * c.kernel_h * c.kernel_w;
-            let weights = decode_weights(&c.weights_b64, n_weights, idx, "weights")?;
-            let bias = decode_weights_opt(c.bias_b64.as_ref(), c.out_channels, idx, "bias")?;
-            Ok(ResolvedLayer::Conv2d(Conv2dLayer {
-                in_channels: c.in_channels,
-                out_channels: c.out_channels,
-                kernel_h: c.kernel_h,
-                kernel_w: c.kernel_w,
-                stride: c.stride,
-                padding: c.padding,
-                weights,
-                bias,
-            }))
-        }
+        "conv2d" => resolve_conv(v, idx),
         "flatten" => {
             let f: FlattenRaw =
                 serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
@@ -410,13 +430,123 @@ fn resolve_layer(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, Sim
     }
 }
 
-/// Returns `(input_features, output_features)` for dimension-continuity checking.
-/// LIF layers return `(None, None)` — they neither change nor consume the feature count.
-/// Flatten and Conv2d return `(None, None)` — spatial shape tracking is deferred (M3).
-fn layer_dims(layer: &ResolvedLayer) -> (Option<usize>, Option<usize>) {
-    match layer {
-        ResolvedLayer::Dense(d) => (Some(d.in_features), Some(d.out_features)),
-        ResolvedLayer::Conv2d(c) => (Some(c.in_channels), Some(c.out_channels)),
-        ResolvedLayer::Lif(_) | ResolvedLayer::Flatten(_) => (None, None),
+fn resolve_conv(v: &serde_json::Value, idx: usize) -> Result<ResolvedLayer, SimError> {
+    let c: Conv2dRaw = serde_json::from_value(v.clone()).map_err(|e| SimError::JsonParseError {
+        detail: format!("layer[{idx}] conv2d parse error: {e}"),
+    })?;
+    let groups = c.groups.unwrap_or(1);
+    let dilation = match c.dilation.as_deref() {
+        None => [1, 1],
+        Some([h, w]) => [*h, *w],
+        Some([d]) => [*d, *d],
+        Some(other) => {
+            return Err(SimError::SpatialShape {
+                layer_idx: idx,
+                message: format!("dilation has length {}", other.len()),
+                reason: "Conv2d dilation is a pair of height and width".into(),
+                fix: "recompile the model with thrindex".into(),
+            });
+        }
+    };
+    if groups == 0
+        || !c.in_channels.is_multiple_of(groups)
+        || !c.out_channels.is_multiple_of(groups)
+    {
+        return Err(SimError::SpatialShape {
+            layer_idx: idx,
+            message: format!(
+                "groups={groups} does not divide in_channels={} and out_channels={}",
+                c.in_channels, c.out_channels
+            ),
+            reason: "a grouped convolution splits both channel counts evenly".into(),
+            fix: "set groups so both channel counts divide it, as torch.nn.Conv2d requires".into(),
+        });
     }
+    let in_per_group = c.in_channels / groups;
+    let n_weights = c.out_channels * in_per_group * c.kernel_h * c.kernel_w;
+    let weights = decode_weights(&c.weights_b64, n_weights, idx, "weights")?;
+    let bias = decode_weights_opt(c.bias_b64.as_ref(), c.out_channels, idx, "bias")?;
+    Ok(ResolvedLayer::Conv2d(Conv2dLayer {
+        in_channels: c.in_channels,
+        out_channels: c.out_channels,
+        kernel_h: c.kernel_h,
+        kernel_w: c.kernel_w,
+        stride: c.stride,
+        padding: c.padding,
+        groups,
+        dilation,
+        input_height: c.input_height,
+        input_width: c.input_width,
+        weights,
+        bias,
+    }))
+}
+
+fn decode_delays(
+    b64: Option<&str>,
+    encoding: Option<&str>,
+    n_connections: usize,
+    layer_idx: usize,
+) -> Result<Option<Vec<u16>>, SimError> {
+    let Some(b64) = b64 else {
+        return Ok(None);
+    };
+    let bytes = BASE64
+        .decode(b64)
+        .map_err(|e| SimError::Base64DecodeError {
+            layer_idx,
+            field: "delays".to_string(),
+            detail: e.to_string(),
+        })?;
+    let mut delays = vec![0_u16; n_connections];
+    match encoding.unwrap_or("dense") {
+        "dense" => {
+            if bytes.len() != n_connections * 2 {
+                return Err(SimError::WeightShapeMismatch {
+                    layer_idx,
+                    declared: n_connections,
+                    decoded: bytes.len(),
+                    got_f32: bytes.len() / 2,
+                });
+            }
+            for (slot, chunk) in delays.iter_mut().zip(bytes.chunks_exact(2)) {
+                *slot = u16::from_le_bytes([chunk[0], chunk[1]]);
+            }
+        }
+        "sparse" => {
+            if !bytes.len().is_multiple_of(6) {
+                return Err(SimError::WeightShapeMismatch {
+                    layer_idx,
+                    declared: n_connections,
+                    decoded: bytes.len(),
+                    got_f32: bytes.len() / 6,
+                });
+            }
+            for chunk in bytes.chunks_exact(6) {
+                let index = usize::try_from(u32::from_le_bytes([
+                    chunk[0], chunk[1], chunk[2], chunk[3],
+                ]))
+                .unwrap_or(usize::MAX);
+                let steps = u16::from_le_bytes([chunk[4], chunk[5]]);
+                let Some(slot) = delays.get_mut(index) else {
+                    return Err(SimError::SpatialShape {
+                        layer_idx,
+                        message: format!("sparse delay index {index} is outside 0..{n_connections}"),
+                        reason: "each pair addresses one dense connection".into(),
+                        fix: "recompile the model".into(),
+                    });
+                };
+                *slot = steps;
+            }
+        }
+        other => {
+            return Err(SimError::SpatialShape {
+                layer_idx,
+                message: format!("unknown delay encoding \"{other}\""),
+                reason: "the simulator reads \"dense\" or \"sparse\" delay bytes".into(),
+                fix: "recompile the model with thrindex".into(),
+            });
+        }
+    }
+    Ok(Some(delays))
 }

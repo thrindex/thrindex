@@ -226,6 +226,33 @@ class TestDense:
         assert layer.linear.weight.grad is not None
         assert layer.linear.weight.grad.abs().max() > 0
 
+    def test_delay_backward_reaches_the_weight(self) -> None:
+        layer = snn.Dense(1, 1, bias=False, delay=2)
+        with torch.no_grad():
+            layer.linear.weight.fill_(0.5)
+        model = snn.Sequential(layer, snn.LIF(threshold=0.1, tau_mem=5.0))
+        x = torch.tensor([[[1.0]], [[0.0]], [[0.0]], [[0.0]]], requires_grad=False)
+        loss = model(x).sum()
+        loss.backward()
+        assert layer.linear.weight.grad is not None
+        assert layer.linear.weight.grad.abs().item() > 0
+
+    def test_delay_shifts_the_input_by_one_step(self) -> None:
+        layer = snn.Dense(1, 1, bias=False, delay=1)
+        with torch.no_grad():
+            layer.linear.weight.fill_(1.0)
+        model = snn.Sequential(layer)
+        # [T, batch, features]
+        x = torch.tensor([[[1.0]], [[0.0]], [[0.0]]])
+        out = model(x)
+        assert torch.equal(out, torch.tensor([[[0.0]], [[1.0]], [[0.0]]]))
+
+    def test_delay_rejects_values_that_do_not_fit_in_u16(self) -> None:
+        import pytest
+
+        with pytest.raises(ValueError, match="65535"):
+            snn.Dense(1, 1, delay=65536)
+
 
 # ── Conv2d ─────────────────────────────────────────────────────────────────────
 
@@ -305,6 +332,29 @@ class TestSequential:
         assert len(grads) == 2, "Both Dense layers should have gradients"
         for g in grads:
             assert g.abs().max() > 0, "Dense gradient is all-zero"
+
+    def test_recorded_membrane_is_the_value_compared_with_threshold(self) -> None:
+        lif = snn.LIF(threshold=1.0, tau_mem=10.0, reset="subtract")
+        model = snn.Sequential(lif)
+        # One timestep, one neuron. Input 1.5, previous membrane 0.
+        # mem_t = alpha * 0 + 1.5 = 1.5, which is above threshold.
+        x = torch.tensor([[[1.5]]])
+        plain = model(x)
+        recorded = model.forward_recorded(x)
+        assert torch.equal(recorded.output, plain)
+        alpha = torch.tensor(lif.alpha)
+        assert torch.allclose(recorded.membrane[0], alpha * 0 + 1.5)
+        assert recorded.layer_spikes[0].item() == 1.0
+
+    def test_recorded_layers_can_be_limited(self) -> None:
+        model = snn.Sequential(
+            snn.Dense(2, 2, bias=False),
+            snn.LIF(threshold=1.0, tau_mem=10.0),
+        )
+        x = torch.zeros(2, 1, 2)
+        recorded = model.forward_recorded(x, layers=(1,))
+        assert 0 not in recorded.layer_spikes
+        assert 1 in recorded.membrane
 
     def test_state_resets_between_forward_calls(self) -> None:
         """Two identical forward calls must produce identical outputs (state does not leak)."""

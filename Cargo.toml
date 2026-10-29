@@ -10,5 +10,4 @@ members = [
     "crates/thrindex-cli",
     "crates/thrindex-py",
     "conformance",
-    "crates/thrindex-backends/akida",
 ]

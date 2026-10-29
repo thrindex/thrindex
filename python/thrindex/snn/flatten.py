@@ -5,9 +5,8 @@ state dict, parameter iteration) is inherited without reimplementation.
 
 Compile support: :func:`thrindex.compile.compile_model` recognises any
 :class:`torch.nn.Flatten` instance (including this subclass) and serialises it
-as a ``flatten`` IR node.  The Rust compiler propagates it into the ``.thx``
-artifact.  The simulator treats it as a no-op until spatial shape tracking is
-implemented.
+as a ``flatten`` IR node.  The simulator applies it as ``torch.nn.Flatten`` on
+a batch of one, so a convolution can be followed by a dense layer.
 """
 
 from __future__ import annotations

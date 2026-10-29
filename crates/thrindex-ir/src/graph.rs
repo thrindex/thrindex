@@ -161,13 +161,39 @@ pub struct GraphConv2d {
 
     /// Optional bias as base64 little-endian `f32` (length `out_channels`).
     pub bias_b64: Option<String>,
+
+    /// Image height of the first convolution. Absent on older artifacts.
+    /// PyTorch does not store the image size. A chip compiler cannot place the
+    /// layer without it, so the authoring API records it on the portable `.thx`.
+    /// A following dense layer does not carry a spatial size.
+    #[serde(default)]
+    pub input_height: Option<usize>,
+
+    /// Image width of the first convolution. Absent on older artifacts.
+    #[serde(default)]
+    pub input_width: Option<usize>,
+
+    /// `torch.nn.Conv2d` groups. Older artifacts omit it and mean 1.
+    #[serde(default = "default_groups")]
+    pub groups: usize,
+
+    /// Dilation `[height, width]`. Older artifacts omit it and mean `[1, 1]`.
+    #[serde(default = "default_dilation")]
+    pub dilation: [usize; 2],
+}
+
+fn default_groups() -> usize {
+    1
+}
+
+fn default_dilation() -> [usize; 2] {
+    [1, 1]
 }
 
 /// Flatten layer in the Graph IR.
 ///
 /// No learned parameters.  Carries `start_dim` / `end_dim` for fidelity with
-/// `torch.nn.Flatten`; the simulator treats this as a no-op until full spatial
-/// shape tracking is implemented (M3 deferred).
+/// `torch.nn.Flatten`. The simulator applies that reshape on a batch of one.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphFlatten {
     /// First dimension to flatten (1 = first non-batch dim, matching torch default).
